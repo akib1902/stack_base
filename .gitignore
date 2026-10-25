@@ -1,0 +1,28 @@
+node_modules/
+.pnpm-store/
+dist/
+.next/
+out/
+coverage/
+
+# Local environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local-first development database (PGlite) and test artifacts
+.data/
+**/.data/
+
+# Logs and OS cruft
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Build metadata
+*.tsbuildinfo

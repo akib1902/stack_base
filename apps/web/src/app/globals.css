@@ -1,0 +1,285 @@
+@import 'tailwindcss';
+
+/* Graphite Terminal is the dark presentation of the same token set. */
+@custom-variant dark (&:where([data-theme='graphite'], [data-theme='graphite'] *));
+
+:root {
+  color-scheme: light;
+  --background: #faf8f4;
+  --surface: #ffffff;
+  --surface-raised: #f3efe7;
+  --primary: #d97706;
+  --primary-foreground: #1f1a12;
+  --foreground: #29251f;
+  --muted-foreground: #77716a;
+  --border: #e8e1d6;
+  --success: #2f7d57;
+  --error: #c2413a;
+  --ring: #d97706;
+
+  /* Category accents, stored as `r g b` triplets for rgb()/color-mix(). */
+  --tint-amber: 217 119 6;
+  --tint-rose: 190 60 90;
+  --tint-indigo: 79 70 229;
+  --tint-sky: 2 132 199;
+  --tint-teal: 13 116 112;
+  --tint-slate: 113 113 122;
+}
+
+[data-theme='graphite'] {
+  color-scheme: dark;
+  --background: #17191c;
+  --surface: #202328;
+  --surface-raised: #292d33;
+  --primary: #f2a93b;
+  --primary-foreground: #17191c;
+  --foreground: #f1f2f4;
+  --muted-foreground: #a4aab3;
+  --border: #383d45;
+  --success: #67c59a;
+  --error: #f07878;
+  --ring: #f2a93b;
+
+  --tint-amber: 242 169 59;
+  --tint-rose: 251 160 182;
+  --tint-indigo: 165 180 252;
+  --tint-sky: 125 211 252;
+  --tint-teal: 94 234 212;
+  --tint-slate: 148 163 184;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius-card: 18px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 24%, transparent);
+  }
+}
+
+.auth-glow {
+  background-image: radial-gradient(
+    120% 90% at 50% -20%,
+    color-mix(in oklab, var(--primary) 18%, transparent),
+    transparent 65%
+  );
+}
+
+/* ---------- Ambient canvas ---------- */
+
+/* A soft wash behind the content so frosted surfaces have something to refract. */
+.app-canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.app-canvas::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(
+      58% 48% at 8% -6%,
+      color-mix(in oklab, var(--primary) 20%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(46% 42% at 96% 4%, rgb(109 124 255 / 0.13), transparent 70%),
+    radial-gradient(52% 46% at 62% 104%, rgb(28 156 138 / 0.11), transparent 72%);
+}
+
+[data-theme='graphite'] .app-canvas::before {
+  background-image:
+    radial-gradient(
+      58% 48% at 6% -8%,
+      color-mix(in oklab, var(--primary) 15%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(46% 42% at 98% 0%, rgb(79 91 213 / 0.24), transparent 68%),
+    radial-gradient(52% 46% at 58% 108%, rgb(15 118 110 / 0.22), transparent 70%);
+}
+
+/* ---------- Frosted surfaces ---------- */
+
+.glass {
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--surface) 94%, transparent),
+    color-mix(in oklab, var(--surface) 72%, transparent)
+  );
+  /* The blur itself comes from `backdrop-blur-*` utilities so it survives
+     minification; this rule owns the gradient, rim light and shadow. */
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 20px 44px -34px rgb(42 29 9 / 0.55);
+}
+
+[data-theme='graphite'] .glass {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 20px 44px -30px #000;
+}
+
+/* ---------- Category accents ---------- */
+
+.tint-amber {
+  --tint: var(--tint-amber);
+}
+.tint-rose {
+  --tint: var(--tint-rose);
+}
+.tint-indigo {
+  --tint: var(--tint-indigo);
+}
+.tint-sky {
+  --tint: var(--tint-sky);
+}
+.tint-teal {
+  --tint: var(--tint-teal);
+}
+.tint-slate {
+  --tint: var(--tint-slate);
+}
+
+.icon-chip {
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: rgb(var(--tint));
+  background-image: linear-gradient(
+    150deg,
+    color-mix(in oklab, rgb(var(--tint)) 24%, transparent),
+    color-mix(in oklab, rgb(var(--tint)) 10%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, rgb(var(--tint)) 22%, transparent);
+  transition:
+    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 240ms ease;
+}
+
+.group:hover .icon-chip {
+  transform: translateY(-2px) scale(1.1) rotate(-4deg);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, rgb(var(--tint)) 34%, transparent),
+    0 10px 18px -12px color-mix(in oklab, rgb(var(--tint)) 70%, transparent);
+}
+
+/* ---------- Bento tile motion ---------- */
+
+.bento-tile {
+  transition:
+    transform 280ms cubic-bezier(0.22, 0.9, 0.28, 1),
+    box-shadow 280ms ease,
+    border-color 220ms ease;
+}
+
+.bento-tile:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in oklab, var(--border) 50%, rgb(var(--tint)) 50%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 26px 44px -28px rgb(42 29 9 / 0.45);
+}
+
+[data-theme='graphite'] .bento-tile:hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 26px 44px -26px #000;
+}
+
+.bento-tile:active {
+  transform: translateY(-1px) scale(0.985);
+  transition-duration: 90ms;
+}
+
+/* A slow specular sweep gives the tile a tactile response without blocking it. */
+.bento-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background-image: linear-gradient(
+    112deg,
+    transparent 32%,
+    rgb(255 255 255 / 0.55) 46%,
+    transparent 60%
+  );
+  background-size: 240% 100%;
+  background-position: 165% 0;
+  transition:
+    opacity 300ms ease,
+    background-position 900ms cubic-bezier(0.16, 0.84, 0.44, 1);
+}
+
+.bento-tile:hover::after {
+  opacity: 0.5;
+  background-position: -45% 0;
+}
+
+[data-theme='graphite'] .bento-tile::after {
+  background-image: linear-gradient(
+    112deg,
+    transparent 32%,
+    rgb(255 255 255 / 0.12) 46%,
+    transparent 60%
+  );
+}
+
+/* ---------- Entrance ---------- */
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.994);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.reveal {
+  animation: reveal-up 520ms cubic-bezier(0.22, 0.9, 0.28, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

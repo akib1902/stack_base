@@ -1,0 +1,24 @@
+{
+  "name": "stackbase",
+  "version": "0.1.0",
+  "private": true,
+  "description": "StackBase — self-hostable, personal cloud drive with client-side encryption and Telegram-backed storage",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev:api": "pnpm --filter @stackbase/api dev",
+    "dev:web": "pnpm --filter @stackbase/web dev",
+    "start:api": "pnpm --filter @stackbase/api start",
+    "start:web": "pnpm --filter @stackbase/web start",
+    "build": "pnpm --filter @stackbase/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @stackbase/api db:migrate",
+    "db:reset": "pnpm --filter @stackbase/api db:reset"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

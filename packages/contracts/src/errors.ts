@@ -1,0 +1,29 @@
+/**
+ * Stable error codes from SRS A11. Every API error response carries one of
+ * these codes; clients branch on the code, never on the message text.
+ */
+export const ERROR_CODES = [
+  'AUTH_REQUIRED',
+  'FORBIDDEN',
+  'VALIDATION_ERROR',
+  'FILE_TOO_LARGE',
+  'STORAGE_DISCONNECTED',
+  'TELEGRAM_RATE_LIMIT',
+  'TELEGRAM_SESSION_EXPIRED',
+  'UPLOAD_SOURCE_REQUIRED',
+  'UPLOAD_STATE_CONFLICT',
+  'UPLOAD_INTEGRITY_FAILED',
+  'ENCRYPTION_FAILED',
+  'DECRYPTION_FAILED',
+  'FILE_NOT_FOUND',
+  'VERSION_NOT_FOUND',
+  'SHARE_EXPIRED',
+  'SHARE_REVOKED',
+  'DATABASE_UNAVAILABLE',
+  'STORAGE_RECONCILIATION_REQUIRED',
+  'RATE_LIMITED',
+  'ROUTE_NOT_FOUND',
+  'INTERNAL_ERROR',
+] as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[number];
