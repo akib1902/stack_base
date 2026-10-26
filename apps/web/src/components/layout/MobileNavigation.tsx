@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Settings } from 'lucide-react';
+import { Clock, FolderOpen, Home, Settings, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const ITEMS = [
   { href: '/', label: 'Home', Icon: Home },
+  { href: '/files', label: 'Files', Icon: FolderOpen },
+  { href: '/recent', label: 'Recent', Icon: Clock },
+  { href: '/trash', label: 'Trash', Icon: Trash2 },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];
 
@@ -20,7 +23,7 @@ export function MobileNavigation() {
     >
       <ul className="mx-auto flex max-w-md">
         {ITEMS.map(({ href, label, Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href === '/files' && pathname.startsWith('/files'));
           return (
             <li key={href} className="flex-1">
               <Link

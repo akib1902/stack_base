@@ -42,16 +42,14 @@ function ChecklistRow({
 export function SetupProgressCard({
   storage,
   className,
-  delay,
 }: {
   storage: SetupStatusResponse['storage'];
   className?: string;
-  delay?: number;
 }) {
   const storageState = describeStorage(storage);
 
   return (
-    <Card className={className} delay={delay}>
+    <Card className={className}>
       <CardHeading
         icon={<ShieldCheck className="size-4" />}
         title="Setup"

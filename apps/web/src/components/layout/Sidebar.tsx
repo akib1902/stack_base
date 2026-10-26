@@ -3,7 +3,7 @@ import { NavLinks } from './NavLinks';
 
 export function Sidebar({ email }: { email: string | null }) {
   return (
-    <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border glass bg-surface/70 backdrop-blur-xl backdrop-saturate-150 lg:flex">
+    <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-surface lg:flex">
       <div className="flex items-center gap-3 px-5 pb-5 pt-5">
         <span
           aria-hidden="true"
@@ -24,7 +24,7 @@ export function Sidebar({ email }: { email: string | null }) {
       <div className="mt-auto border-t border-border px-5 py-4">
         <p className="truncate text-xs font-medium">{email ?? 'Signed in'}</p>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          Foundation build — encrypted uploads arrive in the next milestone.
+          Metadata build — encrypted uploads arrive in the next milestone.
         </p>
       </div>
     </aside>

@@ -7,17 +7,15 @@ import { formatDuration } from '@/lib/utils/format';
 export function ServiceStatusCard({
   health,
   className,
-  delay,
 }: {
   health: HealthResponse | null;
   className?: string;
-  delay?: number;
 }) {
   const apiVariant = health?.status === 'ok' ? 'success' : health ? 'warning' : 'danger';
   const databaseVariant = health?.database === 'ok' ? 'success' : 'danger';
 
   return (
-    <Card className={className} delay={delay}>
+    <Card className={className}>
       <CardHeading
         icon={<Activity className="size-4" />}
         title="Service status"

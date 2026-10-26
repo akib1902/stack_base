@@ -7,16 +7,14 @@ export function StorageSummaryCard({
   files,
   folders,
   className,
-  delay,
 }: {
   bytes: number;
   files: number;
   folders: number;
   className?: string;
-  delay?: number;
 }) {
   return (
-    <Card className={className} delay={delay}>
+    <Card className={className}>
       <CardHeading icon={<HardDrive className="size-4" />} title="Logical storage" />
 
       <p className="text-3xl font-semibold tracking-tight tabular-nums">{formatBytes(bytes)}</p>

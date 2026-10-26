@@ -24,9 +24,6 @@ credentials are required to run, test or review this milestone.
   idempotently if a project predates the trigger.
 - `GET /api/v1/setup/status` — owner-scoped storage connection state plus live file,
   folder and byte counts (trashed items excluded).
-- `GET /api/v1/library/summary` — per-category file counts and bytes for the Bento home
-  screen, computed in one grouped SQL query; empty categories are returned as real zeros
-  and trashed files are excluded.
 - `POST /api/v1/dev/session` — development-only local sign-in; never registered in
   production.
 - Uniform error envelope with SRS A11 codes, request validation, 404 handling, CORS
@@ -60,12 +57,6 @@ credentials are required to run, test or review this milestone.
   visible focus rings, reduced-motion support.
 - Sign-in page with accessible form states; protected `(app)` segment redirects to
   sign-in; sign-out clears the session cookie.
-- Bento home: nine category tiles (Photos, Videos, Audio, Documents, APKs, Archives, Apps,
-  Downloads, Other files) with 2/1/1 → 1/1/1/1 → 2/2 column rhythm, per-category accent,
-  size, count and share-of-library bar — all from `library/summary`.
-- Frosted Bento surfaces (gradient fill, rim light, backdrop blur over an ambient wash),
-  staggered entrance, hover lift with specular sweep, spring-eased icon chips and press
-  scale; every animation is CSS-only, respects reduced motion and never gates an action.
 - Bento dashboard: logical storage, setup checklist, library empty state, live service
   status — every value comes from the API, nothing is fabricated.
 - Settings: appearance (working), account, Telegram connection state, encryption status,
@@ -80,13 +71,12 @@ credentials are required to run, test or review this milestone.
 | `apps/api/test/auth.test.ts` (12) | pass — missing/malformed/expired/wrong-audience/service-role tokens rejected; identity from token only; dev route absent in production; validation and 404 envelopes; no-store headers |
 | `apps/api/test/setup-status.test.ts` (4) | pass — real counts, trashed excluded, per-owner isolation, connection state without session leakage |
 | `apps/api/test/rls.test.ts` (15) | pass — cross-user read/insert/update/delete blocked, forged ownership rejected, cross-owner folder parent and tag rejected, cycle rejected, version immutability, current-version consistency, audit read own/write denied, internal tables inaccessible to `authenticated` and `anon` |
-| `apps/api/test/library-summary.test.ts` (4) | pass — auth required; all nine categories in canonical order with zero counts for a new account; real mime/extension aggregation (including a `.JPG` extension and a trashed file that must not count); per-owner isolation |
-| `apps/web/test/*` (16) | pass — formatting helpers, storage/setup/library/service-status cards including the "unreachable" and "not connected" states; category grid rendering all nine tiles, real counts/sizes/share bars, and no inert controls |
+| `apps/web/test/*` (13) | pass — formatting helpers, storage/setup/library/service-status cards including the "unreachable" and "not connected" states |
 | `pnpm --filter @stackbase/api typecheck` | pass |
 | `pnpm --filter @stackbase/contracts typecheck` | pass |
 | `pnpm --filter @stackbase/web typecheck` (`tsc --noEmit`) | pass |
 | `next build` | pass — `/`, `/settings`, `/sign-in` build as dynamic server-rendered routes |
-| Manual browser verification | pass — unauthenticated redirect, sign-in, dashboard with live data, nine category tiles in the intended 4-column rhythm (474/231 px spans), computed `backdrop-filter: blur(24px) saturate(1.5)` on tiles and chrome, category accents and glass shadows in both themes, theme switch with no flash, settings, sign-out clearing the cookie, mobile layout at 390 px with 56 px touch targets and no horizontal overflow |
+| Manual browser verification | pass — unauthenticated redirect, sign-in, dashboard with live data, theme switch (aria-pressed + computed colours), settings, sign-out clearing the cookie, mobile layout at 390 px with 56 px touch targets and no horizontal overflow |
 
 `pnpm db:migrate` was run against a fresh database: all ten migrations applied; the
 consistency checks in `0010` rejected two genuine defects during development (missing RLS
@@ -111,8 +101,8 @@ server-only tables) — both were fixed in code, not by weakening the check.
    `/api/v1/search` with schemas, pagination and owner-scoped queries.
 2. File and folder CRUD, bulk actions, favorites, tags, sorting and filtering in the UI,
    with grid and list views.
-3. Give the existing category tiles a real destination: `/files?category=…` browsing that
-   reuses the same classification expression.
+3. Bento category cards (Images, Videos, Audio, Documents, APKs, Archives, Downloads,
+   Other) backed by real aggregate queries.
 4. TanStack Query introduced for client-side server state, with cache invalidation instead
    of full-library refreshes.
 5. Loading, refreshing, empty and permission-denied states for each new screen; tests for

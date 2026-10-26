@@ -71,3 +71,51 @@ export async function signIn(
 export const authHeader = (session: DevSession): Record<string, string> => ({
   authorization: `Bearer ${session.accessToken}`,
 });
+
+export interface TestFileInput {
+  name: string;
+  folderId?: string | null;
+  mimeType?: string;
+  sizeBytes?: number;
+  favorite?: boolean;
+  description?: string | null;
+  deleted?: boolean;
+}
+
+/**
+ * Logical file rows are created by the upload pipeline, which ships in the
+ * storage milestone, so metadata tests insert them directly and then exercise
+ * every route through the HTTP layer.
+ */
+export async function insertTestFile(
+  db: Db,
+  userId: string,
+  input: TestFileInput,
+): Promise<string> {
+  const dot = input.name.lastIndexOf('.');
+  const extension = dot > 0 ? input.name.slice(dot + 1).toLowerCase() : null;
+
+  const { rows } = await db.query<{ id: string }>(
+    `insert into public.files
+       (user_id, folder_id, name, extension, mime_type, logical_size_bytes, favorite, description, deleted_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, case when $9 then now() else null end)
+     returning id`,
+    [
+      userId,
+      input.folderId ?? null,
+      input.name,
+      extension,
+      input.mimeType ?? 'application/octet-stream',
+      input.sizeBytes ?? 1024,
+      input.favorite ?? false,
+      input.description ?? null,
+      input.deleted ?? false,
+    ],
+  );
+
+  const id = rows[0]?.id;
+  if (!id) {
+    throw new Error('insertTestFile returned no id');
+  }
+  return id;
+}

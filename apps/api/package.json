@@ -8,6 +8,7 @@
     "start": "tsx src/server.ts",
     "db:migrate": "tsx src/database/migrate-cli.ts",
     "db:reset": "tsx src/database/reset-cli.ts",
+    "seed": "tsx src/database/seed-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

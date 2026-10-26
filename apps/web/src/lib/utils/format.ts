@@ -39,6 +39,36 @@ export function formatDateTime(value: string): string {
   }).format(date);
 }
 
+export function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+/**
+ * Calendar-day relative label. `now` is injectable so tests are not clock-bound.
+ */
+export function formatRelativeDate(value: string, now = new Date()): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown';
+  }
+
+  const dayStart = (input: Date): number =>
+    Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate());
+  const days = Math.round((dayStart(now) - dayStart(date)) / 86_400_000);
+
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return formatDate(value);
+}
+
 export function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(total / 3600);

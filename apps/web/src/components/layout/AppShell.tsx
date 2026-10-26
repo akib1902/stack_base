@@ -6,7 +6,7 @@ import { TopBar } from './TopBar';
 
 export function AppShell({ user, children }: { user: AuthUser; children: ReactNode }) {
   return (
-    <div className="app-canvas min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <a
         href="#main"
         className="sr-only rounded-lg bg-surface px-3 py-2 text-sm focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:border focus:border-border"

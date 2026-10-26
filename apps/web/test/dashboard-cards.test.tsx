@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { HealthResponse, SetupStatusResponse } from '@stackbase/contracts';
-import { LibraryCard } from '@/components/dashboard/LibraryCard';
 import { ServiceStatusCard } from '@/components/dashboard/ServiceStatusCard';
 import { StorageSummaryCard } from '@/components/dashboard/StorageSummaryCard';
 import { SetupProgressCard } from '@/components/dashboard/SetupProgressCard';
@@ -50,19 +49,6 @@ describe('SetupProgressCard', () => {
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.getByText(/Linked as \+15550000000/)).toBeInTheDocument();
     expect(screen.getByText(/Last validated/)).toBeInTheDocument();
-  });
-});
-
-describe('LibraryCard', () => {
-  it('shows an empty state when there are no files', () => {
-    render(<LibraryCard files={0} folders={0} bytes={0} />);
-    expect(screen.getByText('Your library is empty')).toBeInTheDocument();
-  });
-
-  it('shows real totals once files exist', () => {
-    render(<LibraryCard files={2} folders={1} bytes={2048} />);
-    expect(screen.getByText(/2 files in 1 folder/)).toBeInTheDocument();
-    expect(screen.getByText('2.00 KB')).toBeInTheDocument();
   });
 });
 

@@ -1,44 +1,65 @@
-import type { LibrarySummaryResponse } from '@stackbase/contracts';
+import Link from 'next/link';
+import type { CategorySummary } from '@stackbase/contracts';
+import { Card, CardHeading } from '@/components/ui/Card';
+import { CATEGORY_META } from '@/features/library/category-meta';
+import { FileTypeIcon } from '@/components/library/FileTypeIcon';
 import { cn } from '@/lib/utils/cn';
-import { formatCount } from '@/lib/utils/format';
-import { CategoryTile } from './CategoryTile';
+import { formatBytes, formatCount } from '@/lib/utils/format';
 
 export function CategoryBento({
-  summary,
+  categories,
+  totalFiles,
   className,
 }: {
-  summary: LibrarySummaryResponse;
+  categories: readonly CategorySummary[];
+  totalFiles: number;
   className?: string;
 }) {
-  const totalBytes = summary.totals.bytes;
-
   return (
-    <section aria-labelledby="browse-heading" className={className}>
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 id="browse-heading" className="text-sm font-semibold tracking-tight">
-            Browse
-          </h2>
-          <p className="mt-0.5 text-xs text-muted">
-            Sorted by type from your own file metadata — never sample data.
-          </p>
-        </div>
-        <p className="text-[11px] tabular-nums text-muted">
-          {formatCount(summary.totals.files, 'file')} across{' '}
-          {formatCount(summary.categories.length, 'category', 'categories')}
-        </p>
-      </div>
+    <Card className={className}>
+      <CardHeading
+        title="Categories"
+        hint="Real counts from your metadata; choose a tile to filter the library"
+        action={
+          <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+            Open library
+          </Link>
+        }
+      />
 
-      <div className={cn('grid grid-cols-2 gap-3 lg:grid-cols-4')}>
-        {summary.categories.map((entry, index) => (
-          <CategoryTile
-            key={entry.category}
-            entry={entry}
-            index={index}
-            sharePercent={totalBytes > 0 ? Math.round((entry.bytes / totalBytes) * 100) : 0}
-          />
-        ))}
-      </div>
-    </section>
+      <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        {categories.map((entry) => {
+          const meta = CATEGORY_META[entry.category];
+          return (
+            <li key={entry.category}>
+              <Link
+                href={`/files?category=${entry.category}`}
+                className={cn(
+                  'flex h-full flex-col justify-between gap-3 rounded-xl border border-border bg-surface-raised/40 p-3 transition-colors',
+                  'hover:border-primary/35 hover:bg-surface-raised',
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <FileTypeIcon category={entry.category} className="size-9" />
+                  <span className="text-sm font-semibold tabular-nums">{entry.files}</span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium">{meta.label}</p>
+                  <p className="mt-0.5 text-[11px] text-muted">
+                    {entry.files === 0 ? meta.empty : formatBytes(entry.bytes)}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="mt-3 text-[11px] leading-relaxed text-muted">
+        {totalFiles === 0
+          ? 'Files arrive through the encrypted upload pipeline in the storage milestone. Folders, tags and metadata are fully usable now.'
+          : `${formatCount(totalFiles, 'file')} classified by MIME type first, then by extension.`}
+      </p>
+    </Card>
   );
 }

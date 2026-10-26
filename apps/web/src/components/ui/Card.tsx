@@ -4,20 +4,16 @@ import { cn } from '@/lib/utils/cn';
 export function Card({
   children,
   className,
-  delay,
 }: {
   children: ReactNode;
   className?: string;
-  /** Entrance offset in milliseconds, used to stagger a Bento row. */
-  delay?: number;
 }) {
   return (
     <div
       className={cn(
-        'glass reveal rounded-card border border-border p-5 backdrop-blur-xl backdrop-saturate-150',
+        'rounded-card border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(20,16,10,0.04)]',
         className,
       )}
-      style={delay === undefined ? undefined : { animationDelay: `${delay}ms` }}
     >
       {children}
     </div>

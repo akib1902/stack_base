@@ -9,7 +9,7 @@ import { createTokenVerifier, readBearerToken } from './security/token';
 import { registerHealthRoutes } from './modules/health/routes';
 import { registerMeRoutes } from './modules/me/routes';
 import { registerSetupRoutes } from './modules/setup/routes';
-import { registerLibraryRoutes } from './modules/library/routes';
+import { registerLibraryRoutes } from './modules/library';
 import { registerDevAuthRoutes } from './modules/dev-auth/routes';
 
 export interface BuildAppOptions {

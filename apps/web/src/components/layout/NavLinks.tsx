@@ -24,11 +24,11 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { href: '/', label: 'Home', icon: Home, available: true },
-  { href: '/files', label: 'All files', icon: FolderOpen, available: false },
-  { href: '/recent', label: 'Recent', icon: Clock, available: false },
-  { href: '/favorites', label: 'Favorites', icon: Star, available: false },
+  { href: '/files', label: 'All files', icon: FolderOpen, available: true },
+  { href: '/recent', label: 'Recent', icon: Clock, available: true },
+  { href: '/favorites', label: 'Favorites', icon: Star, available: true },
   { href: '/shared', label: 'Shared', icon: Share2, available: false },
-  { href: '/trash', label: 'Trash', icon: Trash2, available: false },
+  { href: '/trash', label: 'Trash', icon: Trash2, available: true },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
@@ -84,7 +84,13 @@ export function NavLinks() {
       <ul className="space-y-0.5">
         {PRIMARY_NAV.map((item) => (
           <li key={item.label}>
-            <NavRow item={item} active={pathname === item.href} />
+            <NavRow
+            item={item}
+            active={
+              pathname === item.href ||
+              (item.href === '/files' && pathname.startsWith('/files'))
+            }
+          />
           </li>
         ))}
       </ul>
@@ -92,7 +98,13 @@ export function NavLinks() {
       <ul className="mt-4 space-y-0.5 border-t border-border pt-3">
         {SECONDARY_NAV.map((item) => (
           <li key={item.label}>
-            <NavRow item={item} active={pathname === item.href} />
+            <NavRow
+            item={item}
+            active={
+              pathname === item.href ||
+              (item.href === '/files' && pathname.startsWith('/files'))
+            }
+          />
           </li>
         ))}
       </ul>

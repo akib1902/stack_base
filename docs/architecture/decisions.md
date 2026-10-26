@@ -168,52 +168,11 @@ startup.
 
 ---
 
-## ADR-011 — Home categories are computed by one SQL expression
-
-**Context.** The FDD requires Bento category cards (Images, Videos, Audio, Documents, APKs,
-Archives, Downloads, Other) and states that every count must come from real backend data.
-Categories could be derived in TypeScript, in SQL, or stored on the row.
-
-**Decision.** `GET /api/v1/library/summary` returns all nine categories (empty ones as
-explicit zeros, in a fixed order) using a single grouped query with a `case` expression
-(`apps/api/src/modules/library/categories.ts`). Classification prefers `mime_type` and
-falls back to the normalized `extension`; the expression is fixed SQL with only the owner
-id parameterized.
-
-**Consequences.** One rule for the dashboard and for later filtering, one round trip, no
-per-file loop. Adding a category means changing the expression, the contract union and the
-tile metadata together — the compiler and the API test catch a partial change. "Downloads"
-is defined as transfer artifacts (`.iso`, `.img`, `.torrent`, `.part`, `.crdownload`, `.bin`)
-rather than "anything downloaded", because the browser does not know a file's provenance.
-
----
-
-## ADR-012 — Frosted surfaces via utility blur, motion as CSS only
-
-**Context.** The FDD asks for Bento layout, selective glassmorphism and short, purposeful
-microinteractions, with reduced-motion support and no motion that blocks interaction.
-
-**Decision.** Glass is a composable pair: a `.glass` rule (gradient fill, rim light,
-shadow) plus Tailwind `backdrop-blur-xl backdrop-saturate-150` utilities. The blur lives in
-the utilities because the CSS minifier dropped `backdrop-filter` from the hand-written rule
-— verified in the browser, not assumed. Motion is CSS: a 45 ms-staggered `reveal` entrance,
-a 4 px hover lift with a specular sweep, a spring-eased icon chip and a press scale, all
-disabled by the existing global `prefers-reduced-motion` block. No animation library, no
-client JavaScript for presentation.
-
-**Consequences.** Tiles stay server components and keep working without JavaScript. Hover
-transforms are decorative only, so a missed hover never hides functionality. The category
-tiles are informational `<article>` elements, not buttons or links, until the file browser
-(Milestone 2) gives them a real destination — nothing is inert.
-
----
-
 ## Known gaps at Milestone 1 (deliberate)
 
 - No Telegram MTProto adapter, session storage or `StorageProvider` implementation.
 - No cryptographic format, vault key hierarchy or recovery flow; uploads are disabled.
 - No upload jobs, chunk transfer or worker process (schema exists, code does not).
-- No file/folder/tag/search routes; the schema is in place for Milestone 2. Only the
-  read-only category aggregate exists, so tiles have no drill-down destination yet.
+- No file/folder/tag/search routes; the schema is in place for Milestone 2.
 - No PWA manifest, service worker, offline queue or Playwright end-to-end suite.
 - No Dockerfiles or CI pipeline.

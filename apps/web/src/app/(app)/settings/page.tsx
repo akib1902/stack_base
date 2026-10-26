@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation';
-import type { MeResponse, SetupStatusResponse } from '@stackbase/contracts';
+import type { MeResponse, SetupStatusResponse, TagListResponse } from '@stackbase/contracts';
 import type { ReactNode } from 'react';
-import { Lock, Palette, Send, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react';
+import { Lock, Palette, Send, ShieldCheck, SlidersHorizontal, Tag, UserRound } from 'lucide-react';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Card, CardHeading } from '@/components/ui/Card';
+import { LibraryPreferences } from '@/features/settings/library-preferences';
+import { TagManager } from '@/features/settings/tag-manager';
 import { ThemePicker } from '@/features/settings/theme-picker';
 import { describeStorage } from '@/features/setup/storage-status';
 import { UnauthenticatedError, apiFetch } from '@/lib/api/client';
@@ -24,11 +26,13 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
 export default async function SettingsPage() {
   let me: MeResponse;
   let setup: SetupStatusResponse;
+  let tags: TagListResponse;
 
   try {
-    [me, setup] = await Promise.all([
+    [me, setup, tags] = await Promise.all([
       apiFetch<MeResponse>('/api/v1/me'),
       apiFetch<SetupStatusResponse>('/api/v1/setup/status'),
+      apiFetch<TagListResponse>('/api/v1/tags'),
     ]);
   } catch (error) {
     if (error instanceof UnauthenticatedError) {
@@ -62,6 +66,35 @@ export default async function SettingsPage() {
           hint="Applied instantly and remembered in this browser"
         />
         <ThemePicker current={theme} />
+      </Card>
+
+      <Card>
+        <CardHeading
+          icon={<SlidersHorizontal className="size-4" />}
+          title="Library defaults"
+          hint="Used when a library view opens without an explicit choice"
+        />
+        <LibraryPreferences settings={me.settings} />
+        <dl className="mt-4 border-t border-border pt-3">
+          <DetailRow label="Trash retention">
+            {me.settings.trashRetentionDays === 0
+              ? 'No automatic expiry'
+              : `${me.settings.trashRetentionDays} days`}
+          </DetailRow>
+        </dl>
+        <p className="mt-2 text-[11px] leading-relaxed text-muted">
+          Trash currently keeps items until you restore or permanently delete them. Automatic
+          purging arrives with the lifecycle milestone.
+        </p>
+      </Card>
+
+      <Card>
+        <CardHeading
+          icon={<Tag className="size-4" />}
+          title="Tags"
+          hint="Labels that group files across folders"
+        />
+        <TagManager tags={tags.items} />
       </Card>
 
       <Card>
@@ -136,24 +169,6 @@ export default async function SettingsPage() {
           Losing the passphrase and every recovery copy permanently prevents decryption; the
           server never holds the key material to restore it.
         </p>
-      </Card>
-
-      <Card>
-        <CardHeading
-          icon={<SlidersHorizontal className="size-4" />}
-          title="Uploads and retention"
-          hint="Stored defaults, read-only until the settings API ships"
-        />
-        <dl>
-          <DetailRow label="Retention for trashed files">
-            {me.settings.trashRetentionDays} days
-          </DetailRow>
-          <DetailRow label="Default view">{me.settings.defaultView}</DetailRow>
-          <DetailRow label="Default sort">{me.settings.defaultSort}</DetailRow>
-          <DetailRow label="Offline metadata">
-            {me.settings.offlineEnabled ? 'Enabled' : 'Disabled'}
-          </DetailRow>
-        </dl>
       </Card>
 
       <Card>

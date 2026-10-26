@@ -1,11 +1,16 @@
 import { redirect } from 'next/navigation';
-import type { LibrarySummaryResponse, MeResponse, SetupStatusResponse } from '@stackbase/contracts';
+import type {
+  LibrarySummaryResponse,
+  MeResponse,
+  SetupStatusResponse,
+} from '@stackbase/contracts';
 import { Badge } from '@/components/ui/Badge';
 import { CategoryBento } from '@/components/dashboard/CategoryBento';
-import { LibraryCard } from '@/components/dashboard/LibraryCard';
+import { FilesMiniCard } from '@/components/dashboard/FilesMiniCard';
 import { ServiceStatusCard } from '@/components/dashboard/ServiceStatusCard';
 import { SetupProgressCard } from '@/components/dashboard/SetupProgressCard';
 import { StorageSummaryCard } from '@/components/dashboard/StorageSummaryCard';
+import { TrashCard } from '@/components/dashboard/TrashCard';
 import { UnauthenticatedError, apiFetch, apiHealth } from '@/lib/api/client';
 
 export const metadata = { title: 'Home' };
@@ -32,48 +37,61 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-6">
-      <header className="reveal flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
             Overview
           </p>
           <h1 className="mt-1 text-[26px] font-semibold leading-tight tracking-tight sm:text-3xl">
             Your drive, at a glance
           </h1>
           <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
-            Everything here is read from {me.user.email ?? 'your account'}&apos;s own metadata —
-            categories, storage and connection health included.
+            Live metadata for {me.user.email ?? 'your account'}, organized by category and
+            ready for encrypted uploads.
           </p>
         </div>
         <Badge variant="primary" className="self-start sm:self-auto">
-          Foundation build
+          Metadata build
         </Badge>
       </header>
 
-      <CategoryBento summary={summary} />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
         <StorageSummaryCard
-          bytes={setup.library.bytes}
-          files={setup.library.files}
-          folders={setup.library.folders}
-          delay={0}
-          className="sm:col-span-2 lg:col-span-2"
-        />
-        <SetupProgressCard storage={setup.storage} delay={60} className="sm:col-span-2 lg:col-span-4" />
-        <LibraryCard
-          files={setup.library.files}
-          folders={setup.library.folders}
-          bytes={setup.library.bytes}
-          delay={120}
+          bytes={summary.totals.bytes}
+          files={summary.totals.files}
+          folders={summary.totals.folders}
           className="sm:col-span-2 lg:col-span-3"
         />
-        <ServiceStatusCard health={health} delay={180} className="sm:col-span-2 lg:col-span-3" />
+        <SetupProgressCard
+          storage={setup.storage}
+          className="sm:col-span-2 lg:col-span-5"
+        />
+        <TrashCard
+          totals={summary.totals}
+          retentionDays={me.settings.trashRetentionDays}
+          className="sm:col-span-2 lg:col-span-4"
+        />
+        <CategoryBento
+          categories={summary.categories}
+          totalFiles={summary.totals.files}
+          className="sm:col-span-2 lg:col-span-12"
+        />
+        <FilesMiniCard
+          kind="recent"
+          files={summary.recent}
+          className="sm:col-span-2 lg:col-span-7"
+        />
+        <FilesMiniCard
+          kind="largest"
+          files={summary.largest}
+          className="sm:col-span-2 lg:col-span-5"
+        />
+        <ServiceStatusCard health={health} className="sm:col-span-2 lg:col-span-12" />
       </div>
 
       <p className="text-[11px] leading-relaxed text-muted">
-        StackBase never shows sample files or placeholder statistics. Empty tiles stay empty until
-        your own files exist.
+        Every number on this page is read from your own database. StackBase never shows sample
+        files or placeholder statistics.
       </p>
     </div>
   );
