@@ -47,11 +47,11 @@ export default async function HomePage() {
           </h1>
           <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
             Live metadata for {me.user.email ?? 'your account'}, organized by category and
-            ready for encrypted uploads.
+            ready for encrypted uploads from this device.
           </p>
         </div>
         <Badge variant="primary" className="self-start sm:self-auto">
-          Metadata build
+          Encrypted storage
         </Badge>
       </header>
 
@@ -64,6 +64,7 @@ export default async function HomePage() {
         />
         <SetupProgressCard
           storage={setup.storage}
+          vault={setup.encryption.vault}
           className="sm:col-span-2 lg:col-span-5"
         />
         <TrashCard

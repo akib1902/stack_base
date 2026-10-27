@@ -147,7 +147,7 @@ export async function LibraryPage({
       <EmptyState
         icon={<FolderOpen className="size-4" aria-hidden="true" />}
         title="Your library is empty"
-        description="Create a folder to start organizing. File records arrive through the encrypted upload pipeline in the storage milestone — nothing is uploaded yet."
+        description="Create a folder, then upload — files are encrypted in this browser before they are stored, so an upload starts by creating or unlocking your vault."
         footer={<NewFolderButton folders={folders.items} parentId={null} />}
       />
     );

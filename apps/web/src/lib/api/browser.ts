@@ -1,6 +1,6 @@
 /**
  * Browser → route handler helper. The token is an httpOnly cookie, so the
- * browser can only reach the API through this app's own handlers (ADR-018);
+ * browser can only reach the API through this app's own handlers (ADR-017);
  * they keep the API's `{ error: { code, message } }` envelope intact, which is
  * what makes a real reason displayable in the UI.
  */

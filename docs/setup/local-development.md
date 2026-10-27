@@ -35,6 +35,11 @@ validated at startup; the process refuses to boot with a clear list of problems.
 | `DEV_SESSION_TTL_SECONDS` | `86400` | 300–2592000 |
 | `DATABASE_URL` | empty | Empty ⇒ local PGlite; set ⇒ PostgreSQL/Supabase |
 | `STACKBASE_LOCAL_AUTH_STUB` | `0` | Only for a bare PostgreSQL without Supabase's auth schema |
+| `STORAGE_PROVIDER` | `local` | `local` (filesystem, development only) or `telegram` |
+| `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | — | Required when `STORAGE_PROVIDER=telegram`; from <https://my.telegram.org> |
+| `SESSION_ENCRYPTION_KEY` | — | 32 bytes base64 (`openssl rand -base64 32`); seals the stored Telegram session |
+| `MAX_UPLOAD_BYTES` | `17179869184` | 1 GiB–16 GiB, single-file upload cap |
+| `MAX_ACTIVE_UPLOADS` | `4` | Unfinished upload jobs allowed per user (1–32) |
 | `LOG_LEVEL` | `info` | Pino level; authorization headers are redacted |
 
 ### Local database
@@ -89,10 +94,49 @@ pnpm build         # production web build
 - `apps/api/test/setup-status.test.ts` — owner-scoped status, no cross-user leakage
 - `apps/api/test/rls.test.ts` — assumes the `authenticated` role and sets
   `request.jwt.claims` exactly as Supabase does, then proves cross-user access fails
-- `apps/web/test/*` — formatting and dashboard component rendering
+- `apps/api/test/storage-*.test.ts`, `telegram-provider.test.ts`, `uploads.test.ts`,
+  `encryption-vault.test.ts` — provider contract, session sealing, vault records and the
+  full chunked upload pipeline (checksums, resume, finalize, version immutability)
+- `apps/web/test/crypto-vectors.test.ts` — the pinned `stackbase/1` vectors
+- `apps/web/test/crypto-file-format.test.ts` — layout, round-trip and authenticity
+- `apps/web/test/upload-pipeline.test.ts` — encrypt → create → stream → finalize,
+  resume, cancellation and failure handling against a fake transport
 
 Tests need no external services: each API suite starts an in-memory PostgreSQL, applies
 every migration, and disposes of it afterwards.
+
+## 6. Encrypted uploads
+
+Everything runs in the browser; the API only ever sees ciphertext.
+
+1. **Vault (once per account).** Open Settings → *Encryption and recovery* and create a
+   vault: the browser derives an Argon2id key from your passphrase, wraps a random vault
+   key and stores only parameters plus ciphertext (`GET`/`POST /api/v1/encryption/vault`).
+   The passphrase and the key never leave the page; reloading locks the vault again.
+2. **Storage.** With `STORAGE_PROVIDER=local` (the default) ciphertext is written under
+   `apps/api/.data/objects/`. To use your own Telegram account, set
+   `STORAGE_PROVIDER=telegram`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` and
+   `SESSION_ENCRYPTION_KEY`, restart the API, then link the account from Settings
+   (phone → code → optional two-step password). The MTProto session is sealed before it
+   is stored and is never returned by an endpoint.
+3. **Upload.** *Upload* in the library header, or drop a file onto the library. The
+   browser unlocks the vault (if locked), encrypts chunk by chunk, creates an upload job,
+   streams the chunks with per-chunk SHA-256 checksums and declares the two stream hashes
+   at finalize. The queue panel reports per-file progress; *Retry* resumes a failed job
+   and keeps the chunks that already arrived.
+4. **Download.** *Download & decrypt* in a file's details fetches the ciphertext stream,
+   verifies every chunk and the recorded SHA-256, decrypts locally and then saves the file.
+5. **Verify the stored copy** (optional, operator-side):
+
+   ```bash
+   pnpm storage:verify --email you@example.com   # or --user <uuid>
+   ```
+
+   It re-hashes every stored object, reports missing or size-mismatched ones and marks
+   them `missing` for reconciliation. `--dry-run` only reports.
+
+Drop `pnpm seed` in for development fixtures (metadata only — real files come from the
+upload pipeline).
 
 ## Switching to Supabase
 
@@ -132,4 +176,8 @@ every migration, and disposes of it afterwards.
 | Web shows "Something went wrong" | The API is not running: start `pnpm dev:api` |
 | `Migration failed: schema "auth" does not exist` | You pointed `DATABASE_URL` at a bare PostgreSQL. Use Supabase, or set `STACKBASE_LOCAL_AUTH_STUB=1` knowingly |
 | Sign-in returns 404 | The API runs with `AUTH_MODE=supabase` or `NODE_ENV=production`; dev sessions are disabled by design |
+| Upload fails with `TELEGRAM_NOT_CONFIGURED` (503) | `STORAGE_PROVIDER=telegram` without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH`/`SESSION_ENCRYPTION_KEY` |
+| Upload fails with `STORAGE_DISCONNECTED` (409) | Link the Telegram account from Settings, or switch back to `STORAGE_PROVIDER=local` |
+| Settings shows *Development storage* | That is the local filesystem provider working as intended outside production |
+| Download fails with a decryption error | The stored ciphertext does not match its manifest; run `pnpm storage:verify` and re-upload |
 | `db:reset` refuses to run | `DATABASE_URL` is set; drop and recreate that database deliberately instead |

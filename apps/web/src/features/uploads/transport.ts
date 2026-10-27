@@ -13,7 +13,7 @@ import { sendJson, sendRaw } from '@/lib/api/browser';
 import type { UploadTransport } from './pipeline';
 
 /**
- * Talks to this app's own route handlers (ADR-018), which attach the httpOnly
+ * Talks to this app's own route handlers (ADR-017), which attach the httpOnly
  * session cookie's token and forward to the API. Chunk bodies stay binary the
  * whole way; only the metadata travels as JSON.
  */

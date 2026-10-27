@@ -9,7 +9,7 @@ import {
  * The session token lives in an httpOnly cookie, so the browser cannot talk to
  * the API directly. Every browser-initiated call (uploads, downloads, vault
  * creation) goes through a Next route handler, which attaches the token and
- * forwards the response — see ADR-018.
+ * forwards the response — see ADR-017.
  */
 
 const ERROR_HEADERS = { 'cache-control': 'no-store' } as const;

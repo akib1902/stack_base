@@ -6,11 +6,15 @@ files are encrypted in the browser so the server never sees plaintext.
 
 The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 
-> **Status: Milestone 1 — foundation.** Authentication, owner-scoped authorization,
-> the full database schema with row-level security, the application shell and both
-> themes are implemented and tested. Encrypted uploads, Telegram storage, previews,
-> versions, sharing and the PWA are **not** implemented yet; the UI never pretends
-> otherwise. See [Milestone 1 report](docs/reports/milestone-1.md).
+> **Status: Milestone 3 — encrypted storage and the upload pipeline.** Authentication,
+> owner-scoped authorization, the full database schema with row-level security, the
+> metadata library, the `stackbase/1` client-side encryption format, provider-neutral
+> storage (local filesystem + Telegram MTProto), chunked encrypted uploads with
+> immutable versions and browser-side download/decryption are implemented and tested.
+> Previews, sharing, offline/PWA, resume controls and the Supabase sign-in screen are
+> **not** implemented yet; the UI never pretends otherwise. See the
+> [Milestone 3 report](docs/reports/milestone-3.md) and the
+> [encryption format](docs/architecture/encryption-format.md).
 
 ---
 
@@ -56,6 +60,8 @@ in both places.
 | `pnpm test` | Vitest: API authorization, database RLS isolation, web components |
 | `pnpm db:migrate` | Apply pending migrations (`apps/api`) |
 | `pnpm db:reset` | Recreate the local PGlite database from migrations |
+| `pnpm seed` | Development fixtures (metadata only, refused in production) |
+| `pnpm storage:verify` | Re-hash every stored object; report and mark missing copies |
 
 ## Layout
 
@@ -64,20 +70,22 @@ apps/
   api/                 Fastify + TypeScript API
     src/config/        validated environment configuration
     src/database/      driver-agnostic database layer, migration runner
-    src/modules/       health, me, setup, dev-auth route modules
+    src/modules/       health, me, setup, library, tags, search, vault, storage, uploads
     src/security/      token verification (dev + Supabase), identity derivation
-    test/              authorization and RLS test suites
+    src/storage/       provider registry, local + Telegram backends, session sealing
+    test/              authorization, RLS, storage, uploads and vault suites
   web/                 Next.js App Router
-    src/app/           routes: (auth)/sign-in, (app)/home, (app)/settings
-    src/components/    layout, ui, dashboard, feedback components
-    src/features/      auth, settings, setup feature modules
-    src/lib/           API client, session, theme, formatting
+    src/app/           routes: (auth)/sign-in, (app)/home, settings, /api/* proxies
+    src/components/    layout, ui, dashboard, library, feedback components
+    src/features/      auth, library, settings, setup, encryption, uploads features
+    src/lib/           API client, crypto (vault + file format), session, theme
+    test/              crypto vectors, file format, upload pipeline suites
 packages/
   contracts/           TypeBox schemas shared by API and web
 supabase/
-  migrations/          0001–0010 schema, constraints, indexes, RLS, checks
+  migrations/          0001–0012 schema, constraints, indexes, RLS, checks
   local/               local-only auth stub (never apply to Supabase)
-docs/                  setup, decisions and milestone reports
+docs/                  setup, architecture, decisions and milestone reports
 ```
 
 ## Security model (what exists today)
@@ -94,14 +102,22 @@ docs/                  setup, decisions and milestone reports
 - **Migration 0010 fails the build** if RLS is missing, if `anon` gains privileges, or
   if a table reachable by `authenticated` has no policy.
 - **Sessions stay out of JavaScript.** The web app stores the access token in an
-  httpOnly cookie and attaches it server-side; API responses are `no-store`.
-- **Telegram session material is never exposed** by any endpoint and does not exist in
-  the database yet.
+  httpOnly cookie and attaches it server-side; API responses are `no-store`. The browser
+  reaches the API only through this app's own Next route handlers (ADR-017).
+- **Plaintext never reaches the server.** Files are encrypted in the browser with
+  `stackbase/1` (Argon2id-wrapped vault key, per-version data key, XChaCha20-Poly1305
+  secretstream). The API stores ciphertext, wrapped keys, parameters and hashes, and
+  verifies per-chunk checksums plus the full-stream SHA-256 before creating a version.
+- **Telegram session material is never exposed** by any endpoint: the MTProto session is
+  sealed with AES-256-GCM under `SESSION_ENCRYPTION_KEY` before it is stored, and pending
+  logins live in memory only.
 
 ## Documentation
 
 - [Local development and Supabase deployment](docs/setup/local-development.md)
+- [Encryption format `stackbase/1`](docs/architecture/encryption-format.md)
 - [Architecture decisions and documented deviations](docs/architecture/decisions.md)
+- [Milestone 3 report](docs/reports/milestone-3.md)
 - [Milestone 1 report](docs/reports/milestone-1.md)
 
 ## License

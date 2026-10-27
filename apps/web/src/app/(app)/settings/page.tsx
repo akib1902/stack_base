@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
 import type { MeResponse, SetupStatusResponse, TagListResponse } from '@stackbase/contracts';
 import type { ReactNode } from 'react';
-import { Lock, Palette, Send, ShieldCheck, SlidersHorizontal, Tag, UserRound } from 'lucide-react';
+import { Palette, Send, ShieldCheck, SlidersHorizontal, Tag, UserRound } from 'lucide-react';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Card, CardHeading } from '@/components/ui/Card';
 import { VaultCard } from '@/features/encryption/vault-card';
 import { LibraryPreferences } from '@/features/settings/library-preferences';
+import { TelegramConnectionForm } from '@/features/settings/telegram-connection';
 import { TagManager } from '@/features/settings/tag-manager';
 import { ThemePicker } from '@/features/settings/theme-picker';
 import { describeStorage } from '@/features/setup/storage-status';
@@ -117,8 +118,14 @@ export default async function SettingsPage() {
       <Card>
         <CardHeading
           icon={<Send className="size-4" />}
-          title="Telegram connection"
-          hint="Encrypted payloads live in your own Saved Messages"
+          title={
+            setup.storage.provider === 'local' ? 'Storage connection' : 'Telegram connection'
+          }
+          hint={
+            setup.storage.provider === 'local'
+              ? 'Where this deployment writes ciphertext'
+              : 'Encrypted payloads live in your own Saved Messages'
+          }
           action={
             <Badge variant={storage.variant}>
               <StatusDot variant={storage.variant} />
@@ -127,22 +134,14 @@ export default async function SettingsPage() {
           }
         />
         <p className="text-sm leading-relaxed text-muted">{storage.detail}</p>
-        <dl className="mt-3">
-          <DetailRow label="Provider">Telegram</DetailRow>
-          <DetailRow label="Account">
-            {setup.storage.accountIdentifier ?? 'No account linked'}
-          </DetailRow>
-          <DetailRow label="Last validated">
-            {setup.storage.lastValidatedAt
-              ? formatDateTime(setup.storage.lastValidatedAt)
-              : 'Never'}
-          </DetailRow>
-          {setup.storage.lastErrorCode ? (
+        {setup.storage.lastErrorCode ? (
+          <dl className="mt-3">
             <DetailRow label="Last error">
               <code className="font-mono text-xs">{setup.storage.lastErrorCode}</code>
             </DetailRow>
-          ) : null}
-        </dl>
+          </dl>
+        ) : null}
+        <TelegramConnectionForm storage={setup.storage} />
         <p className="mt-3 text-[11px] leading-relaxed text-muted">
           The MTProto session is encrypted with a deployment key and stays server-side; it is
           never sent to the browser, logged or returned by an endpoint.

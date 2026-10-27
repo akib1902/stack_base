@@ -170,6 +170,9 @@ startup.
 
 ## Known gaps at Milestone 1 (deliberate)
 
+*(All of the first three gaps below were closed in Milestone 3 — see ADR-013 through
+ADR-018 and the Milestone 3 report.)*
+
 - No Telegram MTProto adapter, session storage or `StorageProvider` implementation.
 - No cryptographic format, vault key hierarchy or recovery flow; uploads are disabled.
 - No upload jobs, chunk transfer or worker process (schema exists, code does not).
@@ -332,17 +335,25 @@ API directly.
   deterministic offset (header 24 bytes, chunks of `plaintextChunkSize + 17`), so the staged
   file is already the final ciphertext stream. `upload_chunks` keeps per-chunk metadata
   (checksum, state) only.
-- `upload_jobs` gains a validated `manifest jsonb` column: finalize needs the manifest
-  again to verify the assembled stream hash and to persist the immutable version after a
-  restart (only the client can produce a manifest, so it cannot be recomputed).
+- `upload_jobs` gains a validated `manifest jsonb` column holding the manifest exactly as
+  the client declared it at create (hashes excluded). A browser that encrypts in a single
+  pass cannot know the final hashes before it has streamed the file, so finalize declares
+  `ciphertextHash` and `plaintextFingerprint`; the server verifies the assembled stream
+  against them and persists the completed manifest on the immutable version. Both pieces
+  are stored, so a restart can still finish the job — only the client can produce them.
 - Integrity is checked three times before a version exists: per-chunk SHA-256 on receipt,
   full-stream SHA-256 after the last chunk, and a provider `inspect` after upload.
 - Quotas: at most `MAX_ACTIVE_UPLOADS` (default 4) unfinished jobs per user, per-job size
   capped by `MAX_UPLOAD_BYTES`; staging is deleted on completion, cancellation and
   permanent failure, and a `storage:verify` CLI sweeps leftovers.
-- The browser sends ciphertext through Next route handlers (`/api/upload-chunk/...`,
-  `/api/download/...`); the handler attaches the httpOnly session cookie as a bearer token
-  server-side. No token or session material reaches the browser.
+- The browser sends ciphertext through Next route handlers that mirror the API's upload
+  and download contracts: `POST /api/uploads`,
+  `PUT /api/uploads/:uploadId/chunks/:chunkNumber`, `POST /api/uploads/:uploadId/finalize`,
+  `POST /api/uploads/:uploadId/cancel`, `POST /api/encryption/vault`,
+  `GET /api/files/:fileId/versions` and
+  `GET /api/files/:fileId/versions/:versionId/download`. The handler attaches the httpOnly
+  session cookie as a bearer token server-side. No token or session material reaches the
+  browser, and the API itself never has to know about cookies.
 
 **Consequences.** Bounded memory on both sides (1 MiB chunks end-to-end). The server disk
 holds ciphertext only, briefly, under the documented directory and cleanup rules. Resume

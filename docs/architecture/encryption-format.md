@@ -66,7 +66,11 @@ record; no file has to be re-encrypted.
    The final chunk is the only one that may be shorter than the others.
 5. **`ciphertextHash`** — SHA-256 (lowercase hex) over the complete ciphertext stream,
    header included. The client computes it while encrypting; the server recomputes it
-   while receiving chunks and again after assembling, and stores it on the version.
+   while receiving chunks and again after assembling, and stores it on the version. A
+   browser cannot know the final hash before it has streamed the whole file in one pass,
+   so the hash pair is **declared at finalize** (`POST /api/v1/uploads/:id/finalize`) and
+   persisted into the manifest at that point; the create call carries the manifest
+   without hashes (`UploadManifest`, ADR-013 and ADR-017).
 6. **`plaintextFingerprint`** — SHA-256 (lowercase hex) over the plaintext stream. Kept
    for duplicate detection and source-file reselection checks (SRS A5.4, FR-14); it is not
    a decryption oracle because it is a one-way hash of content the uploader already had.
@@ -134,16 +138,27 @@ the version is never created.
 ## 6. Test vectors
 
 Deterministic vectors are committed in `apps/web/src/lib/crypto/test-vectors.ts` and
-asserted by `apps/web/test/crypto-vectors.test.ts`:
+asserted by `apps/web/test/crypto-vectors.test.ts` (layout and round-trip properties are
+covered by `apps/web/test/crypto-file-format.test.ts`):
 
-- **Vault vector** — fixed passphrase, salt and parameters produce a pinned KEK; wrapping a
-  pinned vault key with a pinned nonce produces pinned ciphertext that opens back.
-- **File vector** — a fixed data key, stream header and nonce-independent content (the
-  secretstream construction derives per-chunk nonces from its own state) encrypt a fixed
-  3-chunk plaintext to a pinned ciphertext hash; decrypting the ciphertext reproduces the
-  plaintext exactly.
-- **Authenticity vectors** — flipping one ciphertext byte, reordering two chunks or
-  truncating the stream must throw and produce no plaintext.
+- **Vault vector** — fixed passphrase, salt and KDF parameters (`ops=3`, `mem=8 MiB`,
+  the schema minimum so the vector runs fast) pin the KEK; a pinned vault key and two
+  pinned secretbox nonces pin the wrapped vault key and the recovery verifier byte for
+  byte. `unlockVault` must reproduce the pinned vault key, and a wrong passphrase or a
+  replaced verifier must fail. Because the wrapped key can only open with the KEK those
+  parameters derive, this pins Argon2id as well.
+- **File vector** — a committed single-chunk ciphertext (stream header included, since
+  `crypto_secretstream_xchacha20poly1305_init_push` draws a random header and libsodium
+  exposes no way to supply one) with its pinned plaintext, data key, wrapped key, sizes
+  and SHA-256 hashes. It must decrypt to exactly the pinned plaintext; a flipped byte, a
+  truncated stream, an extended stream, a mismatched header, a mismatched recorded hash
+  and a data key wrapped under a different vault key must all fail with no plaintext.
+- **Layout and round-trip properties** — sizes `0, 1, 100, chunk−1, chunk, chunk+1,
+  2×chunk` encrypt and decrypt back to the original, with manifest arithmetic matching
+  the contracts; the declared hashes are checked against an independent SHA-256
+  implementation (`node:crypto`); the source is read in chunk-sized slices only.
+- **Authenticity vectors** — reordered chunks, a dropped final chunk, a corrupted chunk
+  and a wrong vault key must throw and produce no plaintext.
 
 Any change that breaks a vector is a format change and must bump the version.
 

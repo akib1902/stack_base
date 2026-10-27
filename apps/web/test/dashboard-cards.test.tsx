@@ -4,6 +4,7 @@ import type { HealthResponse, SetupStatusResponse } from '@stackbase/contracts';
 import { ServiceStatusCard } from '@/components/dashboard/ServiceStatusCard';
 import { StorageSummaryCard } from '@/components/dashboard/StorageSummaryCard';
 import { SetupProgressCard } from '@/components/dashboard/SetupProgressCard';
+import { describeStorage } from '@/features/setup/storage-status';
 
 const storage = (overrides: Partial<SetupStatusResponse['storage']> = {}) => ({
   provider: 'telegram' as const,
@@ -27,12 +28,13 @@ describe('StorageSummaryCard', () => {
 
 describe('SetupProgressCard', () => {
   it('states that storage is not connected when nothing is configured', () => {
-    render(<SetupProgressCard storage={storage()} />);
+    render(<SetupProgressCard storage={storage()} vault="not_configured" />);
 
     expect(screen.getByText('Not connected')).toBeInTheDocument();
-    expect(screen.getByText(/ships with encrypted uploads/i)).toBeInTheDocument();
-    // The vault is presented as planned, never as a working control.
-    expect(screen.getByText('Planned')).toBeInTheDocument();
+    expect(screen.getByText(/Link your Telegram account/i)).toBeInTheDocument();
+    // The vault is reported as absent, never as a working control.
+    expect(screen.getByText('Not set up')).toBeInTheDocument();
+    expect(screen.getByText(/Create a passphrase-wrapped vault/i)).toBeInTheDocument();
   });
 
   it('surfaces a connected account and its last validation time', () => {
@@ -43,12 +45,21 @@ describe('SetupProgressCard', () => {
           accountIdentifier: '+15550000000',
           lastValidatedAt: '2026-10-25T12:00:00.000Z',
         })}
+        vault="configured"
       />,
     );
 
     expect(screen.getByText('Connected')).toBeInTheDocument();
     expect(screen.getByText(/Linked as \+15550000000/)).toBeInTheDocument();
     expect(screen.getByText(/Last validated/)).toBeInTheDocument();
+    expect(screen.getByText('Configured')).toBeInTheDocument();
+    expect(screen.getByText(/encrypted in your browser/i)).toBeInTheDocument();
+  });
+
+  it('describes the development filesystem provider distinctly', () => {
+    const summary = describeStorage(storage({ provider: 'local', status: 'connected' }));
+    expect(summary.label).toBe('Development storage');
+    expect(summary.detail).toMatch(/development filesystem provider/i);
   });
 });
 

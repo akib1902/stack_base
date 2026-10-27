@@ -2,7 +2,7 @@ import { forwardJson, errorResponse } from '@/lib/api/proxy';
 
 /**
  * Browser-facing upload endpoints. They exist because the session token is
- * httpOnly (ADR-018); the payloads are the API's own contracts, unchanged.
+ * httpOnly (ADR-017); the payloads are the API's own contracts, unchanged.
  */
 export async function POST(request: Request): Promise<Response> {
   try {

@@ -41,9 +41,11 @@ function ChecklistRow({
 
 export function SetupProgressCard({
   storage,
+  vault,
   className,
 }: {
   storage: SetupStatusResponse['storage'];
+  vault: SetupStatusResponse['encryption']['vault'];
   className?: string;
 }) {
   const storageState = describeStorage(storage);
@@ -90,11 +92,12 @@ export function SetupProgressCard({
         <ChecklistRow
           icon={<Lock className="size-4" aria-hidden="true" />}
           title="Encryption vault"
-          badge="Planned"
-          variant="muted"
+          badge={vault === 'configured' ? 'Configured' : 'Not set up'}
+          variant={vault === 'configured' ? 'success' : 'muted'}
         >
-          Passphrase-derived vault keys and the versioned encryption format arrive before any
-          upload is enabled.
+          {vault === 'configured'
+            ? 'Files are encrypted in your browser with a passphrase-wrapped vault key. Unlock the vault to upload or download.'
+            : 'Create a passphrase-wrapped vault in settings — every upload is encrypted in the browser first, so a vault is required before any file is stored.'}
         </ChecklistRow>
       </ul>
     </Card>

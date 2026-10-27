@@ -57,7 +57,7 @@ export function CategoryBento({
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
         {totalFiles === 0
-          ? 'Files arrive through the encrypted upload pipeline in the storage milestone. Folders, tags and metadata are fully usable now.'
+          ? 'Files appear here after they are uploaded — drop a file into the library and it is encrypted in your browser before it is stored. Folders, tags and metadata work right away.'
           : `${formatCount(totalFiles, 'file')} classified by MIME type first, then by extension.`}
       </p>
     </Card>
