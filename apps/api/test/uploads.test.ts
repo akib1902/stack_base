@@ -9,11 +9,11 @@ import {
   ciphertextSizeFor,
   totalChunksFor,
   type CreateUploadResponse,
-  type EncryptionManifest,
   type FileVersionListResponse,
   type FinalizeUploadResponse,
   type UploadChunkResponse,
   type UploadJob,
+  type UploadManifest,
 } from '@stackbase/contracts';
 import {
   authHeader,
@@ -27,8 +27,11 @@ import {
 const sha256 = (buffer: Buffer): string => createHash('sha256').update(buffer).digest('hex');
 
 interface Fabricated {
-  manifest: EncryptionManifest;
+  manifest: UploadManifest;
   ciphertext: Buffer;
+  /** Declared at finalize, after the whole stream has been produced. */
+  ciphertextHash: string;
+  plaintextFingerprint: string;
 }
 
 /**
@@ -37,12 +40,15 @@ interface Fabricated {
  * what the server checks (lengths, checksums, assembled hash).
  */
 function fabricate(plaintextSize: number, chunkSize = 64 * 1024): Fabricated {
-  const ciphertext = Buffer.alloc(ciphertextSizeFor(plaintextSize, chunkSize));
-  // Deterministic filler so failures are reproducible.
-  for (let index = 0; index < ciphertext.length; index += 1) {
-    ciphertext[index] = (index * 31 + 7) % 256;
+  // The ciphertext begins with the exact header recorded in the manifest, then
+  // deterministic filler, so the assembled stream can be compared byte for byte.
+  const header = Buffer.alloc(24, 5);
+  const body = Buffer.alloc(ciphertextSizeFor(plaintextSize, chunkSize) - 24);
+  for (let index = 0; index < body.length; index += 1) {
+    body[index] = (index * 31 + 7) % 256;
   }
-  const manifest: EncryptionManifest = {
+  const ciphertext = Buffer.concat([header, body]);
+  const manifest: UploadManifest = {
     format: 'stackbase-file',
     version: 1,
     cipher: 'xchacha20poly1305-secretstream',
@@ -52,16 +58,19 @@ function fabricate(plaintextSize: number, chunkSize = 64 * 1024): Fabricated {
     },
     plaintextSize,
     ciphertextSize: ciphertext.length,
-    ciphertextHash: sha256(ciphertext),
-    plaintextFingerprint: sha256(Buffer.from(`plaintext:${plaintextSize}:${chunkSize}`)),
-    streamHeader: Buffer.alloc(24, 5).toString('base64'),
+    streamHeader: header.toString('base64'),
     wrappedKey: {
       algorithm: 'xsalsa20poly1305',
       nonce: Buffer.alloc(24, 6).toString('base64'),
       ciphertext: Buffer.alloc(48, 7).toString('base64'),
     },
   };
-  return { manifest, ciphertext };
+  return {
+    manifest,
+    ciphertext,
+    ciphertextHash: sha256(ciphertext),
+    plaintextFingerprint: sha256(Buffer.from(`plaintext:${plaintextSize}:${chunkSize}`)),
+  };
 }
 
 const chunkOf = (fabricated: Fabricated, chunkNumber: number): Buffer => {
@@ -90,7 +99,7 @@ afterAll(async () => {
 
 const createUpload = (
   session: DevSession,
-  manifest: EncryptionManifest,
+  manifest: UploadManifest,
   extra: Record<string, unknown> = {},
 ) =>
   ctx.app.inject({
@@ -124,11 +133,15 @@ const putChunk = (
     payload,
   });
 
-const finalize = (session: DevSession, uploadId: string) =>
+const finalize = (session: DevSession, uploadId: string, fabricated: Fabricated) =>
   ctx.app.inject({
     method: 'POST',
     url: `/api/v1/uploads/${uploadId}/finalize`,
     headers: authHeader(session),
+    payload: {
+      ciphertextHash: fabricated.ciphertextHash,
+      plaintextFingerprint: fabricated.plaintextFingerprint,
+    },
   });
 
 const cancel = (session: DevSession, uploadId: string) =>
@@ -183,13 +196,13 @@ describe('upload pipeline', () => {
     expect((first.json() as UploadChunkResponse).upload.receivedChunkNumbers).toEqual([0]);
 
     // Finalize before all chunks is a state conflict, not a partial success.
-    const tooEarly = await finalize(alice, uploadId);
+    const tooEarly = await finalize(alice, uploadId, fabricated);
     expect(tooEarly.statusCode).toBe(409);
     expect(tooEarly.json()).toMatchObject({ error: { code: 'UPLOAD_STATE_CONFLICT' } });
 
     await putAllChunksFrom(alice, uploadId, fabricated, 1);
 
-    const finalized = await finalize(alice, uploadId);
+    const finalized = await finalize(alice, uploadId, fabricated);
     expect(finalized.statusCode).toBe(200);
     const result = finalized.json() as FinalizeUploadResponse;
     expect(result.upload.status).toBe('completed');
@@ -200,7 +213,7 @@ describe('upload pipeline', () => {
       versionNumber: 1,
       sizeBytes: 150_000,
       ciphertextSizeBytes: fabricated.manifest.ciphertextSize,
-      ciphertextHash: fabricated.manifest.ciphertextHash,
+      ciphertextHash: fabricated.ciphertextHash,
       encryptionFormatVersion: 'stackbase/1',
       storageStatus: 'available',
     });
@@ -230,9 +243,7 @@ describe('upload pipeline', () => {
       headers: authHeader(alice),
     });
     expect(download.statusCode).toBe(200);
-    expect(download.headers['x-stackbase-ciphertext-hash']).toBe(
-      fabricated.manifest.ciphertextHash,
-    );
+    expect(download.headers['x-stackbase-ciphertext-hash']).toBe(fabricated.ciphertextHash);
     expect(Buffer.from(download.rawPayload).equals(fabricated.ciphertext)).toBe(true);
 
     const versions = await ctx.app.inject({
@@ -243,7 +254,7 @@ describe('upload pipeline', () => {
     expect((versions.json() as FileVersionListResponse).items).toHaveLength(1);
 
     // Finalizing twice returns the same version instead of creating another.
-    const again = await finalize(alice, uploadId);
+    const again = await finalize(alice, uploadId, fabricated);
     expect(again.statusCode).toBe(200);
     expect((again.json() as FinalizeUploadResponse).version.id).toBe(result.version.id);
   });
@@ -295,7 +306,7 @@ describe('upload pipeline', () => {
     expect((duplicate.json() as UploadChunkResponse).upload.receivedChunks).toBe(1);
 
     await putAllChunksFrom(alice, uploadId, fabricated, 1);
-    expect((await finalize(alice, uploadId)).statusCode).toBe(200);
+    expect((await finalize(alice, uploadId, fabricated)).statusCode).toBe(200);
 
     const afterComplete = await putChunk(alice, uploadId, 0, chunk, sha256(chunk));
     expect(afterComplete.statusCode).toBe(409);
@@ -313,7 +324,7 @@ describe('upload pipeline', () => {
     expect(response.statusCode).toBe(200);
     await putAllChunksFrom(alice, uploadId, fabricated, 1);
 
-    const finalized = await finalize(alice, uploadId);
+    const finalized = await finalize(alice, uploadId, fabricated);
     expect(finalized.statusCode).toBe(422);
     expect(finalized.json()).toMatchObject({ error: { code: 'UPLOAD_INTEGRITY_FAILED' } });
 
@@ -359,11 +370,11 @@ describe('upload pipeline', () => {
     const bobChunk = await putChunk(bob, uploadId, 0, chunkOf(fabricated, 0), sha256(chunkOf(fabricated, 0)));
     expect(bobChunk.statusCode).toBe(404);
 
-    expect((await finalize(bob, uploadId)).statusCode).toBe(404);
+    expect((await finalize(bob, uploadId, fabricated)).statusCode).toBe(404);
     expect((await cancel(bob, uploadId)).statusCode).toBe(404);
 
     await putAllChunksFrom(alice, uploadId, fabricated, 0);
-    const finalized = finalize(alice, uploadId);
+    const finalized = finalize(alice, uploadId, fabricated);
     const result = (await finalized).json() as FinalizeUploadResponse;
 
     const bobVersions = await ctx.app.inject({
@@ -413,7 +424,7 @@ describe('upload pipeline', () => {
     const { upload, file } = created.json() as CreateUploadResponse;
     await putAllChunksFrom(alice, upload.id, fabricated, 0);
 
-    const finalized = await finalize(alice, upload.id);
+    const finalized = await finalize(alice, upload.id, fabricated);
     expect(finalized.statusCode).toBe(200);
     const result = finalized.json() as FinalizeUploadResponse;
     expect(result.version.sizeBytes).toBe(0);
@@ -469,7 +480,7 @@ describe('upload quotas', () => {
   });
 
   it('enforces the active-upload quota and the size cap', async () => {
-    const create = (manifest: EncryptionManifest) =>
+    const create = (manifest: UploadManifest) =>
       smallCtx.app.inject({
         method: 'POST',
         url: '/api/v1/uploads',

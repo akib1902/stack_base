@@ -4,6 +4,7 @@ import {
   CancelUploadResponseSchema,
   CreateUploadRequestSchema,
   CreateUploadResponseSchema,
+  FinalizeUploadRequestSchema,
   FinalizeUploadResponseSchema,
   MAX_PLAINTEXT_CHUNK_SIZE,
   SECRETSTREAM_ABYTES,
@@ -106,19 +107,23 @@ export function registerUploadRoutes(app: FastifyInstance, deps: { db: Db; confi
     },
   );
 
-  app.post<{ Params: UploadParamsType }>(
+  app.post<{
+    Params: UploadParamsType;
+    Body: Static<typeof FinalizeUploadRequestSchema>;
+  }>(
     '/api/v1/uploads/:uploadId/finalize',
     {
       preHandler: app.authenticate,
       schema: {
         params: UploadParams,
+        body: FinalizeUploadRequestSchema,
         response: { 200: FinalizeUploadResponseSchema },
       },
     },
     async (request) => {
       const user = request.user;
       if (!user) throw authRequired();
-      return finalizeUpload(deps, user.id, request.params.uploadId);
+      return finalizeUpload(deps, user.id, request.params.uploadId, request.body);
     },
   );
 

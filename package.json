@@ -17,7 +17,8 @@
     "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @stackbase/api db:migrate",
     "db:reset": "pnpm --filter @stackbase/api db:reset",
-    "seed": "pnpm --filter @stackbase/api seed"
+    "seed": "pnpm --filter @stackbase/api seed",
+    "storage:verify": "pnpm --filter @stackbase/api storage:verify"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -84,11 +84,23 @@ export const ciphertextChunkOffset = (
   chunkNumber * (manifest.chunking.plaintextChunkSize + SECRETSTREAM_ABYTES);
 
 /**
+ * What the client sends when it creates an upload: the full manifest except the
+ * two hashes, which are only known after the whole file has been streamed. The
+ * client reports them at finalize and the server verifies and persists them
+ * into the immutable manifest (ADR-013).
+ */
+export const UploadManifestSchema = Type.Omit(EncryptionManifestSchema, [
+  'ciphertextHash',
+  'plaintextFingerprint',
+]);
+export type UploadManifest = Static<typeof UploadManifestSchema>;
+
+/**
  * Structural consistency beyond the schema: chunking, sizes and the stream
  * layout must agree exactly. Returns a problem description, or null when valid.
  */
 export function checkManifestConsistency(
-  manifest: EncryptionManifest,
+  manifest: Pick<EncryptionManifest, 'plaintextSize' | 'chunking' | 'ciphertextSize'>,
   options: { maxPlaintextBytes: number },
 ): string | null {
   const { plaintextSize, chunking } = manifest;
@@ -199,11 +211,24 @@ export const CreateUploadRequestSchema = Type.Object(
     name: Type.String({ minLength: 1, maxLength: NAME_MAX_LENGTH, pattern: NAME_PATTERN }),
     mimeType: Type.String({ minLength: 1, maxLength: 255 }),
     folderId: Type.Optional(Type.Union([Type.String({ maxLength: 36 }), Type.Null()])),
-    manifest: EncryptionManifestSchema,
+    manifest: UploadManifestSchema,
   },
   { additionalProperties: false },
 );
 export type CreateUploadRequest = Static<typeof CreateUploadRequestSchema>;
+
+/**
+ * The client declares the hashes it computed while streaming; the server verifies
+ * the assembled ciphertext against them before any version is created.
+ */
+export const FinalizeUploadRequestSchema = Type.Object(
+  {
+    ciphertextHash: sha256Hex(),
+    plaintextFingerprint: sha256Hex(),
+  },
+  { additionalProperties: false },
+);
+export type FinalizeUploadRequest = Static<typeof FinalizeUploadRequestSchema>;
 
 export const CreateUploadResponseSchema = Type.Object({
   upload: UploadJobSchema,

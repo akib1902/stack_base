@@ -12,6 +12,7 @@ import {
 } from '@/features/library/actions';
 import { CATEGORY_META } from '@/features/library/category-meta';
 import { folderOptionLabel } from '@/features/library/params';
+import { DownloadFileButton } from '@/features/uploads/download-button';
 import { formatBytes, formatDateTime } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
@@ -136,15 +137,24 @@ export function FileDetailsDialog({
       className="w-[min(94vw,38rem)]"
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-error hover:bg-error/10"
-            onClick={() => onRequestDelete(file)}
-          >
-            Move to trash
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-error hover:bg-error/10"
+              onClick={() => onRequestDelete(file)}
+            >
+              Move to trash
+            </Button>
+            {file.contentStatus === 'ready' ? (
+              <DownloadFileButton
+                fileId={file.id}
+                fileName={file.name}
+                sizeBytes={file.sizeBytes}
+              />
+            ) : null}
+          </div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={onClose}>
               Cancel
@@ -295,8 +305,8 @@ export function FileDetailsDialog({
 
         {file.contentStatus === 'pending' ? (
           <p className="text-[11px] leading-relaxed text-muted">
-            Encrypted content uploads arrive in the storage milestone. Until then this record
-            carries the file’s metadata and no bytes are sent anywhere.
+            This record has metadata but no encrypted content yet — an interrupted upload keeps
+            the file listable while its bytes are still being transferred.
           </p>
         ) : null}
       </div>

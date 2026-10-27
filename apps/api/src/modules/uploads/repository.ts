@@ -8,6 +8,7 @@ import {
   FILE_ENCRYPTION_FORMAT_VERSION,
   SECRETBOX_NONCE_BYTES,
   SECRETSTREAM_HEADER_BYTES,
+  UploadManifestSchema,
   WRAPPED_KEY_BYTES,
   checkManifestConsistency,
   ciphertextChunkLength,
@@ -18,10 +19,12 @@ import {
   type EncryptionManifest,
   type FileVersion,
   type FileVersionListResponse,
+  type FinalizeUploadRequest,
   type FinalizeUploadResponse,
   type StorageProvider,
   type UploadChunkResponse,
   type UploadJob,
+  type UploadManifest,
 } from '@stackbase/contracts';
 import type { Config } from '../../config/env';
 import type { Db, Queryable } from '../../database/db';
@@ -113,6 +116,17 @@ function parseManifest(value: unknown): EncryptionManifest {
     );
   }
   return value as EncryptionManifest;
+}
+
+function parseUploadManifest(value: unknown): UploadManifest {
+  if (!Value.Check(UploadManifestSchema, value)) {
+    throw new ApiError(
+      'STORAGE_RECONCILIATION_REQUIRED',
+      409,
+      'This upload job carries an invalid manifest; reconciliation is required.',
+    );
+  }
+  return value as UploadManifest;
 }
 
 function mapJob(row: UploadRow, receivedChunkNumbers: number[]): UploadJob {
@@ -458,7 +472,7 @@ export async function receiveChunk(
     );
   }
 
-  const manifest = parseManifest(row.manifest);
+  const manifest = parseUploadManifest(row.manifest);
   const totalChunks = Math.max(1, toCount(row.totalChunks));
   if (!Number.isInteger(chunkNumber) || chunkNumber < 0 || chunkNumber >= totalChunks) {
     throw new ApiError(
@@ -535,6 +549,7 @@ export async function finalizeUpload(
   deps: StorageDeps,
   userId: string,
   uploadId: string,
+  declared: FinalizeUploadRequest,
 ): Promise<FinalizeUploadResponse> {
   const row = await loadJob(deps.db, userId, uploadId);
   if (!row) {
@@ -566,7 +581,7 @@ export async function finalizeUpload(
     );
   }
 
-  const manifest = parseManifest(row.manifest);
+  const uploadManifest = parseUploadManifest(row.manifest);
   const totalChunks = Math.max(1, toCount(row.totalChunks));
   const staged = await stagedChunkNumbers(deps.db, uploadId);
   if (staged.length !== totalChunks) {
@@ -583,16 +598,28 @@ export async function finalizeUpload(
   );
 
   const staging = stagingFilePath(deps.config, userId, uploadId);
-  const ciphertextHash = await hashFile(staging);
-  if (ciphertextHash !== manifest.ciphertextHash) {
+  const assembledHash = await hashFile(staging);
+  if (assembledHash !== declared.ciphertextHash) {
     await markJobFailed(deps.db, userId, uploadId, 'UPLOAD_INTEGRITY_FAILED');
     await removeStaging(deps.config, userId, uploadId);
     throw new ApiError(
       'UPLOAD_INTEGRITY_FAILED',
       422,
-      'The assembled ciphertext does not match the manifest hash. Nothing was stored; start the upload again.',
+      'The assembled ciphertext does not match the hash declared by the client. Nothing was stored; start the upload again.',
     );
   }
+
+  // The immutable manifest: what the client sent, plus the hashes it declared
+  // and the server just verified against the assembled stream.
+  const manifest: EncryptionManifest = {
+    ...uploadManifest,
+    ciphertextHash: assembledHash,
+    plaintextFingerprint: declared.plaintextFingerprint,
+  };
+  if (!Value.Check(EncryptionManifestSchema, manifest)) {
+    throw new ApiError('INTERNAL_ERROR', 500, 'The upload manifest could not be finalized.');
+  }
+  const ciphertextHash = assembledHash;
 
   const connection = await deps.db.query<{ provider: StorageProvider }>(
     `select provider from public.storage_connections where id = $1 and user_id = $2`,
@@ -680,7 +707,7 @@ export async function finalizeUpload(
           versionNumber,
           manifest.plaintextSize,
           ciphertextHash,
-          manifest.plaintextFingerprint,
+          declared.plaintextFingerprint,
           FILE_ENCRYPTION_FORMAT_VERSION,
           JSON.stringify(manifest),
           objectRecordId,
@@ -698,7 +725,7 @@ export async function finalizeUpload(
                content_fingerprint = $5,
                updated_at = now()
          where user_id = $1 and id = $2`,
-        [userId, row.fileId, versionId, manifest.plaintextSize, manifest.plaintextFingerprint],
+        [userId, row.fileId, versionId, manifest.plaintextSize, declared.plaintextFingerprint],
       );
 
       await tx.query(

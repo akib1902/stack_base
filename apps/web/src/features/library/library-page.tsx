@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/feedback/EmptyState';
 import { NewFolderButton } from '@/components/library/NewFolderButton';
 import { FileBrowser } from '@/components/library/FileBrowser';
 import { LibraryToolbar } from '@/components/library/LibraryToolbar';
+import { UploadButton } from '@/features/uploads/upload-button';
+import { UploadDropTarget } from '@/features/uploads/drop-target';
 import { UnauthenticatedError, apiFetch } from '@/lib/api/client';
 import { formatCount } from '@/lib/utils/format';
 import {
@@ -169,6 +171,7 @@ export async function LibraryPage({
             {formatCount(files.total, 'file')}
             {filtered ? ' matching' : ''}
           </span>
+          <UploadButton folderId={view.folderId} />
           {mode === 'all' ? (
             <NewFolderButton folders={folders.items} parentId={view.folderId} />
           ) : null}
@@ -211,16 +214,18 @@ export async function LibraryPage({
 
       <LibraryToolbar view={view} mode={mode} basePath={basePath} tags={tags.items} />
 
-      <FileBrowser
-        files={files.items}
-        subfolders={subfolders}
-        folders={folders.items}
-        tags={tags.items}
-        view={view}
-        mode={mode}
-        basePath={basePath}
-        emptyState={emptyState}
-      />
+      <UploadDropTarget folderId={view.folderId}>
+        <FileBrowser
+          files={files.items}
+          subfolders={subfolders}
+          folders={folders.items}
+          tags={tags.items}
+          view={view}
+          mode={mode}
+          basePath={basePath}
+          emptyState={emptyState}
+        />
+      </UploadDropTarget>
 
       {files.total > files.limit ? (
         <nav

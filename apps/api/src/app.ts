@@ -35,6 +35,9 @@ export async function buildApp({
   logger = true,
 }: BuildAppOptions): Promise<FastifyInstance> {
   const app = Fastify({
+    // Strict schemas (vault, manifest) must reject unknown fields instead of
+    // silently stripping them: `additionalProperties: false` becomes a 400.
+    ajv: { customOptions: { removeAdditional: false } },
     logger:
       logger === false
         ? false

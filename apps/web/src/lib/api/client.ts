@@ -83,6 +83,30 @@ export async function apiFetchPublic<T>(path: string, init?: RequestInit): Promi
   return request<T>(path, init, null);
 }
 
+/**
+ * Authenticated call that hands back the raw response instead of parsed JSON.
+ * Used for streamed and binary bodies (ciphertext downloads, chunk uploads),
+ * which must not be buffered into a JSON string on the way through.
+ */
+export async function apiFetchStream(path: string, init?: RequestInit): Promise<Response> {
+  const token = await getSessionToken();
+  if (!token) {
+    throw new UnauthenticatedError();
+  }
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      cache: 'no-store',
+      headers: {
+        ...(init?.headers ?? {}),
+        authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error) {
+    throw new ApiUnavailableError(error);
+  }
+}
+
 export async function apiHealth(): Promise<HealthResponse> {
   try {
     return await request<HealthResponse>('/health', undefined, null);

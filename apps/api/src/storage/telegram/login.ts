@@ -50,18 +50,26 @@ export function createTelegramLoginManager(options: {
     await entry.gateway.disconnect().catch(() => undefined);
   };
 
+  const staleLogin = (): ApiError =>
+    new ApiError(
+      'VALIDATION_ERROR',
+      400,
+      'That phone login is no longer active. Start the sign-in again.',
+    );
+
   const requirePending = async (userId: string, loginId: string): Promise<PendingLogin> => {
     const entry = pending.get(userId);
-    const expired = entry ? now() - entry.createdAt > ttlMs : false;
-    if (!entry || entry.loginId !== loginId || expired) {
-      if (entry) {
-        await discard(entry);
-      }
-      throw new ApiError(
-        'VALIDATION_ERROR',
-        400,
-        'That phone login is no longer active. Start the sign-in again.',
-      );
+    if (!entry) {
+      throw staleLogin();
+    }
+    if (now() - entry.createdAt > ttlMs) {
+      await discard(entry);
+      throw staleLogin();
+    }
+    // A mismatched id (for example a stale browser tab) must not destroy the
+    // pending login the user is actually using.
+    if (entry.loginId !== loginId) {
+      throw staleLogin();
     }
     return entry;
   };

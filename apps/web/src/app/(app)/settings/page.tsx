@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Lock, Palette, Send, ShieldCheck, SlidersHorizontal, Tag, UserRound } from 'lucide-react';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Card, CardHeading } from '@/components/ui/Card';
+import { VaultCard } from '@/features/encryption/vault-card';
 import { LibraryPreferences } from '@/features/settings/library-preferences';
 import { TagManager } from '@/features/settings/tag-manager';
 import { ThemePicker } from '@/features/settings/theme-picker';
@@ -148,28 +149,7 @@ export default async function SettingsPage() {
         </p>
       </Card>
 
-      <Card>
-        <CardHeading
-          icon={<Lock className="size-4" />}
-          title="Encryption and recovery"
-          hint="Client-side encryption is not enabled yet"
-          action={
-            <Badge variant="muted">
-              <StatusDot variant="muted" />
-              Not set up
-            </Badge>
-          }
-        />
-        <p className="text-sm leading-relaxed text-muted">
-          Files will be encrypted in the browser before they leave the device, using a
-          versioned format and a passphrase-wrapped vault key. Until that format is implemented
-          and pinned, uploads stay disabled — no plaintext is stored anywhere in the meantime.
-        </p>
-        <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Losing the passphrase and every recovery copy permanently prevents decryption; the
-          server never holds the key material to restore it.
-        </p>
-      </Card>
+      <VaultCard />
 
       <Card>
         <CardHeading
