@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
 import { loadConfig, type Config } from '../src/config/env';
@@ -6,12 +9,16 @@ import { runMigrations } from '../src/database/migrations';
 
 export const TEST_SECRET = 'test-only-secret-value-with-enough-characters';
 
+/** Every test context gets its own temp storage root; nothing touches the repo. */
 export function testConfig(overrides: Record<string, string> = {}): Config {
+  const root = mkdtempSync(path.join(tmpdir(), 'stackbase-test-'));
   return loadConfig({
     NODE_ENV: 'test',
     AUTH_MODE: 'dev',
     DEV_AUTH_SECRET: TEST_SECRET,
     WEB_ORIGIN: 'http://localhost:3000',
+    STAGING_DIR: path.join(root, 'staging'),
+    LOCAL_STORAGE_DIR: path.join(root, 'objects'),
     ...overrides,
   });
 }
@@ -20,6 +27,8 @@ export interface TestContext {
   db: Db;
   app: FastifyInstance;
   config: Config;
+  stagingDir: string;
+  objectsDir: string;
   close: () => Promise<void>;
 }
 
@@ -33,9 +42,12 @@ export async function createTestContext(config = testConfig()): Promise<TestCont
     db,
     app,
     config,
+    stagingDir: config.storage.stagingDir,
+    objectsDir: config.storage.localObjectsDir,
     async close() {
       await app.close();
       await db.close();
+      rmSync(path.dirname(config.storage.stagingDir), { recursive: true, force: true });
     },
   };
 }
@@ -83,9 +95,8 @@ export interface TestFileInput {
 }
 
 /**
- * Logical file rows are created by the upload pipeline, which ships in the
- * storage milestone, so metadata tests insert them directly and then exercise
- * every route through the HTTP layer.
+ * Logical file rows without content are created by the upload pipeline, so
+ * metadata tests insert them directly and then exercise the routes.
  */
 export async function insertTestFile(
   db: Db,

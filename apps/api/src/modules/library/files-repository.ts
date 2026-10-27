@@ -255,7 +255,7 @@ export async function getFile(
   return rows[0] ? toFileSummary(rows[0]) : null;
 }
 
-async function assertActiveFolder(
+export async function assertActiveFolder(
   tx: Queryable,
   userId: string,
   folderId: string,

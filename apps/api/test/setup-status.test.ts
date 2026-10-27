@@ -1,6 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { SetupStatusResponse } from '@stackbase/contracts';
-import { authHeader, createTestContext, signIn, type DevSession, type TestContext } from './helpers';
+import {
+  authHeader,
+  createTestContext,
+  signIn,
+  testConfig,
+  type DevSession,
+  type TestContext,
+} from './helpers';
+
+const SESSION_KEY = Buffer.alloc(32, 7).toString('base64');
+const SALT = Buffer.alloc(16, 1).toString('base64');
+const NONCE = Buffer.alloc(24, 2).toString('base64');
+const WRAPPED_KEY = Buffer.alloc(48, 3).toString('base64');
+const VERIFIER = Buffer.alloc(51, 4).toString('base64');
 
 let ctx: TestContext;
 let alice: DevSession;
@@ -27,14 +40,15 @@ const getStatus = async (session: DevSession): Promise<SetupStatusResponse> => {
 };
 
 describe('setup status', () => {
-  it('reports zero real library values for a new account', async () => {
+  it('reports a real, provisioned local connection for a new account', async () => {
     const status = await getStatus(bob);
     expect(status.library).toEqual({ files: 0, folders: 0, bytes: 0 });
     expect(status.storage).toMatchObject({
-      provider: 'telegram',
-      status: 'not_configured',
-      accountIdentifier: null,
+      provider: 'local',
+      status: 'connected',
+      accountIdentifier: 'Local development storage',
     });
+    expect(status.encryption.vault).toBe('not_configured');
   });
 
   it('reflects real metadata rows and never leaks another owner’s data', async () => {
@@ -67,11 +81,13 @@ describe('setup status', () => {
     expect(status.library.folders).toBe(1);
   });
 
-  it('reports a configured storage connection without exposing session material', async () => {
+  it('reports only the active provider and never session material', async () => {
+    // A stored Telegram row exists but the deployment runs the local provider,
+    // so the status must not present the Telegram connection as active.
     await ctx.db.query(
       `insert into public.storage_connections
-         (user_id, connection_status, account_identifier, encrypted_session, session_key_version, last_validated_at)
-       values ($1, 'connected', '+15550000000', '\\x00'::bytea, 'v1', now())`,
+         (user_id, provider, connection_status, account_identifier, encrypted_session, session_key_version, last_validated_at)
+       values ($1, 'telegram', 'connected', '+15550000000', '\\x00'::bytea, 'v1', now())`,
       [alice.id],
     );
 
@@ -84,13 +100,77 @@ describe('setup status', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).not.toContain('encrypted_session');
     expect(response.body).not.toContain('\\x00');
+    expect(response.body).not.toContain('+15550000000');
 
     const status = response.json() as SetupStatusResponse;
-    expect(status.storage.status).toBe('connected');
-    expect(status.storage.accountIdentifier).toBe('+15550000000');
-    expect(status.storage.lastValidatedAt).not.toBeNull();
+    expect(status.storage.provider).toBe('local');
+    expect(status.storage.accountIdentifier).toBe('Local development storage');
+  });
 
-    const bobStatus = await getStatus(bob);
-    expect(bobStatus.storage.status).toBe('not_configured');
+  it('reports the vault once it exists and never for another owner', async () => {
+    await ctx.db.query(
+      `insert into public.encryption_vaults
+         (user_id, format_version, kdf_algorithm, kdf_ops_limit, kdf_mem_limit_bytes, kdf_salt,
+          wrap_algorithm, wrapped_key_nonce, wrapped_key_ciphertext, verifier_nonce, verifier_ciphertext)
+       values ($1, 'stackbase/1', 'argon2id13', 3, 67108864, $2, 'xsalsa20poly1305', $3, $4, $3, $5)`,
+      [alice.id, SALT, NONCE, WRAPPED_KEY, VERIFIER],
+    );
+
+    expect((await getStatus(alice)).encryption.vault).toBe('configured');
+    expect((await getStatus(bob)).encryption.vault).toBe('not_configured');
+  });
+});
+
+describe('setup status with the Telegram provider', () => {
+  let telegramCtx: TestContext;
+  let carol: DevSession;
+
+  beforeAll(async () => {
+    telegramCtx = await createTestContext(
+      testConfig({
+        STORAGE_PROVIDER: 'telegram',
+        TELEGRAM_API_ID: '123456',
+        TELEGRAM_API_HASH: '0123456789abcdef0123456789abcdef',
+        SESSION_ENCRYPTION_KEY: SESSION_KEY,
+      }),
+    );
+    carol = await signIn(telegramCtx.app, 'setup-carol@example.com');
+  });
+
+  afterAll(async () => {
+    await telegramCtx.close();
+  });
+
+  it('reports not_configured until a session is stored, then the account without secrets', async () => {
+    const before = await telegramCtx.app.inject({
+      method: 'GET',
+      url: '/api/v1/setup/status',
+      headers: authHeader(carol),
+    });
+    expect((before.json() as SetupStatusResponse).storage).toMatchObject({
+      provider: 'telegram',
+      status: 'not_configured',
+      accountIdentifier: null,
+    });
+
+    await telegramCtx.db.query(
+      `insert into public.storage_connections
+         (user_id, provider, connection_status, account_identifier, encrypted_session, session_key_version, last_validated_at)
+       values ($1, 'telegram', 'connected', '@stackbase_dev', '\\x00'::bytea, 'v1', now())`,
+      [carol.id],
+    );
+
+    const after = await telegramCtx.app.inject({
+      method: 'GET',
+      url: '/api/v1/setup/status',
+      headers: authHeader(carol),
+    });
+    const status = after.json() as SetupStatusResponse;
+    expect(status.storage).toMatchObject({
+      provider: 'telegram',
+      status: 'connected',
+      accountIdentifier: '@stackbase_dev',
+    });
+    expect(after.body).not.toContain('\\x00');
   });
 });

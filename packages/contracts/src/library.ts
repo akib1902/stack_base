@@ -108,7 +108,7 @@ export type FolderListResponse = Static<typeof FolderListResponseSchema>;
 export const NAME_MAX_LENGTH = 255;
 
 /** The character set is deliberately permissive; only separators and control characters are rejected. */
-const NAME_PATTERN = '^[^/\\\\\\u0000-\\u001f\\u007f]+$';
+export const NAME_PATTERN = '^[^/\\\\\\u0000-\\u001f\\u007f]+$';
 
 export const CreateFolderRequestSchema = Type.Object({
   name: Type.String({ minLength: 1, maxLength: NAME_MAX_LENGTH, pattern: NAME_PATTERN }),

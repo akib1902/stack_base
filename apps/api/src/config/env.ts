@@ -20,6 +20,16 @@ const RawEnvSchema = Type.Object({
   DATABASE_URL: Type.Optional(Type.String()),
   STACKBASE_LOCAL_AUTH_STUB: Type.Optional(Type.String()),
   LOG_LEVEL: Type.Optional(Type.String()),
+  STORAGE_PROVIDER: Type.Optional(
+    Type.Union([Type.Literal('local'), Type.Literal('telegram')]),
+  ),
+  TELEGRAM_API_ID: Type.Optional(Type.String({ pattern: '^[0-9]{1,12}$' })),
+  TELEGRAM_API_HASH: Type.Optional(Type.String({ minLength: 16, maxLength: 128 })),
+  SESSION_ENCRYPTION_KEY: Type.Optional(Type.String({ minLength: 1 })),
+  MAX_UPLOAD_BYTES: Type.Optional(Type.String({ pattern: '^[0-9]{1,12}$' })),
+  MAX_ACTIVE_UPLOADS: Type.Optional(Type.String({ pattern: '^[0-9]{1,3}$' })),
+  STAGING_DIR: Type.Optional(Type.String({ minLength: 1 })),
+  LOCAL_STORAGE_DIR: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 type AuthConfig =
@@ -45,6 +55,20 @@ export interface DatabaseConfig {
   allowLocalAuthStub: boolean;
 }
 
+export interface StorageConfig {
+  /** `local` is development/test only and rejected in production (ADR-015). */
+  provider: 'local' | 'telegram';
+  maxUploadBytes: number;
+  maxActiveUploads: number;
+  /** Where ciphertext chunks are staged while uploading (ciphertext only). */
+  stagingDir: string;
+  /** Filesystem root for the local development provider. */
+  localObjectsDir: string;
+  telegram: { apiId: number; apiHash: string } | null;
+  /** AES-256-GCM key sealing MTProto session strings (ADR-016). */
+  sessionKey: { key: Buffer; version: string } | null;
+}
+
 export interface Config {
   nodeEnv: 'development' | 'test' | 'production';
   isProduction: boolean;
@@ -54,6 +78,7 @@ export interface Config {
   logLevel: string;
   auth: AuthConfig;
   database: DatabaseConfig;
+  storage: StorageConfig;
 }
 
 export class ConfigError extends Error {
@@ -92,6 +117,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
 
   const authMode = raw.AUTH_MODE ?? 'dev';
   const auth = buildAuthConfig(raw, authMode, nodeEnv, problems);
+  const storage = buildStorageConfig(raw, nodeEnv, problems);
 
   // PORT=0 means "any free port" to most tooling and cannot be advertised to the
   // web app, so it is treated as unset and the documented default is used.
@@ -113,6 +139,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     logLevel: raw.LOG_LEVEL ?? 'info',
     auth: auth as AuthConfig,
     database: loadDatabaseConfig(source),
+    storage: storage as StorageConfig,
   };
 }
 
@@ -187,5 +214,74 @@ function buildAuthConfig(
       `${raw.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`,
     jwtSecret: raw.SUPABASE_JWT_SECRET ?? null,
     audience: 'authenticated',
+  };
+}
+
+function buildStorageConfig(
+  raw: Static<typeof RawEnvSchema>,
+  nodeEnv: string,
+  problems: string[],
+): StorageConfig | null {
+  const provider = raw.STORAGE_PROVIDER ?? 'local';
+  if (provider === 'local' && nodeEnv === 'production') {
+    problems.push(
+      'STORAGE_PROVIDER=local is development-only; production must use STORAGE_PROVIDER=telegram',
+    );
+    return null;
+  }
+
+  const maxUploadBytes = raw.MAX_UPLOAD_BYTES
+    ? Number.parseInt(raw.MAX_UPLOAD_BYTES, 10)
+    : 2 * 1024 ** 3;
+  if (maxUploadBytes < 1024 ** 2 || maxUploadBytes > 16 * 1024 ** 3) {
+    problems.push('MAX_UPLOAD_BYTES must be between 1048576 and 17179869184');
+  }
+
+  const maxActiveUploads = raw.MAX_ACTIVE_UPLOADS
+    ? Number.parseInt(raw.MAX_ACTIVE_UPLOADS, 10)
+    : 4;
+  if (maxActiveUploads < 1 || maxActiveUploads > 32) {
+    problems.push('MAX_ACTIVE_UPLOADS must be between 1 and 32');
+  }
+
+  let sessionKey: StorageConfig['sessionKey'] = null;
+  if (raw.SESSION_ENCRYPTION_KEY) {
+    const key = Buffer.from(raw.SESSION_ENCRYPTION_KEY, 'base64');
+    if (key.length !== 32) {
+      problems.push(
+        'SESSION_ENCRYPTION_KEY must be exactly 32 bytes encoded as base64 (openssl rand -base64 32)',
+      );
+    } else {
+      sessionKey = { key, version: 'v1' };
+    }
+  }
+
+  let telegram: StorageConfig['telegram'] = null;
+  if (provider === 'telegram') {
+    if (!raw.TELEGRAM_API_ID) {
+      problems.push('TELEGRAM_API_ID is required when STORAGE_PROVIDER=telegram');
+    }
+    if (!raw.TELEGRAM_API_HASH) {
+      problems.push('TELEGRAM_API_HASH is required when STORAGE_PROVIDER=telegram');
+    }
+    if (!sessionKey) {
+      problems.push('SESSION_ENCRYPTION_KEY is required when STORAGE_PROVIDER=telegram');
+    }
+    if (raw.TELEGRAM_API_ID && raw.TELEGRAM_API_HASH) {
+      telegram = {
+        apiId: Number.parseInt(raw.TELEGRAM_API_ID, 10),
+        apiHash: raw.TELEGRAM_API_HASH,
+      };
+    }
+  }
+
+  return {
+    provider,
+    maxUploadBytes,
+    maxActiveUploads,
+    stagingDir: raw.STAGING_DIR ?? path.resolve(process.cwd(), '.data', 'staging'),
+    localObjectsDir: raw.LOCAL_STORAGE_DIR ?? path.resolve(process.cwd(), '.data', 'objects'),
+    telegram,
+    sessionKey,
   };
 }

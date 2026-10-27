@@ -176,3 +176,192 @@ startup.
 - No file/folder/tag/search routes; the schema is in place for Milestone 2.
 - No PWA manifest, service worker, offline queue or Playwright end-to-end suite.
 - No Dockerfiles or CI pipeline.
+
+---
+
+## ADR-011 — Home categories are computed by one SQL expression
+
+*(Restored in Milestone 3; the Milestone 2 commit accidentally dropped this record
+although the code it describes is live.)*
+
+**Context.** The FDD requires Bento category cards (Images, Videos, Audio, Documents, APKs,
+Archives, Downloads, Other) and states that every count must come from real backend data.
+Categories could be derived in TypeScript, in SQL, or stored on the row.
+
+**Decision.** `GET /api/v1/library/summary` returns all nine categories (empty ones as
+explicit zeros, in a fixed order) using a single grouped query with a `case` expression
+(`apps/api/src/modules/library/categories.ts`). Classification prefers `mime_type` and
+falls back to the normalized `extension`; the expression is fixed SQL with only the owner
+id parameterized.
+
+**Consequences.** One rule for the dashboard and for later filtering, one round trip, no
+per-file loop. Adding a category means changing the expression, the contract union and the
+tile metadata together — the compiler and the API test catch a partial change. "Downloads"
+is defined as transfer artifacts (`.iso`, `.img`, `.torrent`, `.part`, `.crdownload`, `.bin`)
+rather than "anything downloaded", because the browser does not know a file's provenance.
+
+---
+
+## ADR-012 — Frosted surfaces via utility blur, motion as CSS only
+
+*(Restored in Milestone 3 along with ADR-011.)*
+
+**Context.** The FDD asks for Bento layout, selective glassmorphism and short, purposeful
+microinteractions, with reduced-motion support and no motion that blocks interaction.
+
+**Decision.** Glass is a composable pair: a `.glass` rule (gradient fill, rim light,
+shadow) plus Tailwind `backdrop-blur-xl backdrop-saturate-150` utilities. The blur lives in
+the utilities because the CSS minifier dropped `backdrop-filter` from the hand-written rule
+— verified in the browser, not assumed. Motion is CSS: a 45 ms-staggered `reveal` entrance,
+a 4 px hover lift with a specular sweep, a spring-eased icon chip and a press scale, all
+disabled by the existing global `prefers-reduced-motion` block. No animation library, no
+client JavaScript for presentation.
+
+**Consequences.** Tiles stay server components and keep working without JavaScript. Hover
+transforms are decorative only, so a missed hover never hides functionality.
+
+---
+
+## ADR-013 — Encryption format `stackbase/1`: libsodium secretstream + Argon2id vault
+
+**Context.** SRS A6 selects a reviewed libsodium streaming construction with Argon2id for
+passphrase derivation and requires the exact package, parameters and interoperability test
+vectors to be pinned before implementation (Milestone 0).
+
+**Decision.** The format is specified in [encryption-format.md](encryption-format.md) and
+implemented client-side only, on `libsodium-wrappers-sumo` (pinned in `apps/web`):
+Argon2id13 (`ops=3`, `mem=64 MiB`) derives a KEK that wraps a random 32-byte vault key;
+each file version gets a random data key wrapped under the vault key; content is encrypted
+with `crypto_secretstream_xchacha20poly1305` in 1 MiB chunks (last chunk tagged `FINAL`,
+24-byte header, 17-byte per-chunk overhead). Versions persist a versioned JSON manifest
+(`file_versions.encryption_manifest`) with the wrapped data key, stream header, sizes and
+SHA-256 hashes; the server validates the manifest's structure and consistency but can never
+decrypt. Deterministic vectors are committed and asserted by tests.
+
+**Consequences.** The server stays unable to read content, file sizes and chunk counts
+remain visible to it (documented), and the per-version wrapped data key leaves room for
+share-specific key transfer in Milestone 5 without exposing the vault key. Any format
+change requires a version bump; `encryption_format_version` makes the stored version
+explicit.
+
+---
+
+## ADR-014 — Vault storage and `/api/v1/encryption/vault` (documented deviation)
+
+**Context.** SRS A6 requires a passphrase-wrapped vault key with recovery verification, and
+C4 requires vault status in Settings — but B2 defines no table for it and A10 no endpoint.
+
+**Decision.** New server-only table `public.encryption_vaults` (RLS enabled, no client
+grants, like `storage_connections`) holding only non-secret parameters and ciphertext:
+KDF algorithm/limits/salt, wrapped vault key (nonce + ciphertext), recovery verifier, format
+version. `GET /api/v1/encryption/vault` returns the record (or null) so a client can
+unwrap; `POST /api/v1/encryption/vault` creates it once and returns **409
+`VAULT_ALREADY_EXISTS`** afterwards — the API never silently replaces an inaccessible vault
+key (A6.4). `GET /api/v1/setup/status` gains an `encryption.vault` field
+(`not_configured` | `configured`).
+
+**Consequences.** The deviation from A10/B2 is explicit here and in the milestone report.
+Passphrase rotation/re-wrapping and share-specific key transfer are Milestone 5 work; the
+schema already supports both without re-encrypting file content.
+
+---
+
+## ADR-015 — Provider abstraction with a first-class local development provider
+
+**Context.** A4.2 requires a provider-independent interface; local development and CI must
+run without a Telegram account (the Milestone 1 precedent), yet production storage must be
+the user's own Telegram account.
+
+**Decision.** `apps/api/src/storage` defines the domain contract
+(`StorageProvider`: `checkConnection` / `upload` / `download` / `delete` / `inspect`) with
+two implementations:
+
+- **`LocalStorageProvider`** (`STORAGE_PROVIDER=local`, development/test only) — stores
+  ciphertext under `apps/api/.data/objects/<userId>/`. `local` is rejected when
+  `NODE_ENV=production`, mirroring the `AUTH_MODE=dev` rule, so production is always
+  Telegram.
+- **`TelegramStorageProvider`** (`STORAGE_PROVIDER=telegram`) — uploads to the user's
+  Saved Messages through MTProto and re-downloads through the same session.
+
+Migration `0012` generalizes `storage_objects`: `provider_reference jsonb` becomes the
+documented provider-facing reference, the Telegram-specific columns become nullable but are
+constrained to remain present for `provider='telegram'`, `provider` may be `'telegram'` or
+`'local'`, and a unique constraint covers `(user_id, provider, provider_reference)`. A local
+connection row is provisioned lazily for the local provider so upload bookkeeping has a
+real `storage_connection_id`.
+
+**Consequences.** Reviewers can exercise the full encrypted pipeline with zero external
+credentials; the Telegram path is unit-tested against an injected fake client and needs a
+real account for manual verification (documented limitation). The API tailors behavior by
+environment variable, never by silent fallback: `telegram` without credentials is a
+configuration error at startup.
+
+---
+
+## ADR-016 — Telegram client pinned to `teleproto`; sessions sealed with AES-256-GCM
+
+**Context.** Milestone 0 requires selecting and pinning the Telegram client library. GramJS
+(`telegram`) is archived and deprecated; A4.4 requires session material to be stored under
+authenticated encryption with a deployment-managed key, and never returned by an endpoint.
+
+**Decision.** Pin `teleproto@1.232.0` (the maintained, largely compatible fork) as an exact
+dependency of `apps/api`. Session strings are sealed with AES-256-GCM under
+`SESSION_ENCRYPTION_KEY` (32 bytes, base64; required when `STORAGE_PROVIDER=telegram`) in
+the format `v1.<base64 nonce>.<base64 ciphertext+tag>`, stored in
+`storage_connections.encrypted_session` with `session_key_version = 'v1'`. Login state
+(pending `phoneCodeHash`, client instance) lives in memory only, one pending login per
+user, TTL 10 minutes. Objects are uploaded as documents named `<storageObjectId>.bin` so
+user file names never reach the provider.
+
+**Consequences.** No session string is ever returned, logged or stored in plaintext; losing
+`SESSION_ENCRYPTION_KEY` forces a Telegram re-login but never exposes a session. Manual
+verification against a real account is required for the network path (see the milestone
+report); everything below the network boundary is covered by unit tests.
+
+---
+
+## ADR-017 — Explicit ciphertext staging; browser transfers proxied by Next route handlers
+
+**Context.** B2 warns that Telegram's temporary upload parts are not durable staging and
+requires an explicit, documented mechanism. A5.6 requires downloads to stream through the
+backend. ADR-006 keeps the session token out of the browser, so the browser cannot call the
+API directly.
+
+**Decision.**- Staging is **one preallocated file per upload job** at
+  `.data/staging/<userId>/<jobId>.part`. Each chunk is written positionally at its
+  deterministic offset (header 24 bytes, chunks of `plaintextChunkSize + 17`), so the staged
+  file is already the final ciphertext stream. `upload_chunks` keeps per-chunk metadata
+  (checksum, state) only.
+- `upload_jobs` gains a validated `manifest jsonb` column: finalize needs the manifest
+  again to verify the assembled stream hash and to persist the immutable version after a
+  restart (only the client can produce a manifest, so it cannot be recomputed).
+- Integrity is checked three times before a version exists: per-chunk SHA-256 on receipt,
+  full-stream SHA-256 after the last chunk, and a provider `inspect` after upload.
+- Quotas: at most `MAX_ACTIVE_UPLOADS` (default 4) unfinished jobs per user, per-job size
+  capped by `MAX_UPLOAD_BYTES`; staging is deleted on completion, cancellation and
+  permanent failure, and a `storage:verify` CLI sweeps leftovers.
+- The browser sends ciphertext through Next route handlers (`/api/upload-chunk/...`,
+  `/api/download/...`); the handler attaches the httpOnly session cookie as a bearer token
+  server-side. No token or session material reaches the browser.
+
+**Consequences.** Bounded memory on both sides (1 MiB chunks end-to-end). The server disk
+holds ciphertext only, briefly, under the documented directory and cleanup rules. Resume
+after refresh remains Milestone 4 work.
+
+---
+
+## ADR-018 — Error codes added for storage, uploads and vaults
+
+**Decision.** Three codes extend the SRS A11 list (which is explicitly non-exhaustive):
+`VAULT_ALREADY_EXISTS` (409, never silently replace a vault), `TELEGRAM_NOT_CONFIGURED`
+(503, the Telegram flow was requested while the deployment is not configured for it) and
+`UPLOAD_NOT_FOUND` (404). Transfer failures use the existing codes: chunk checksum or
+full-stream hash mismatch and provider size mismatch return `UPLOAD_INTEGRITY_FAILED`
+(422), wrong job state returns `UPLOAD_STATE_CONFLICT` (409), quota/size violations return
+`FILE_TOO_LARGE` (413), a missing remote object sets `storage_status='missing'` and returns
+`STORAGE_RECONCILIATION_REQUIRED` (409), Telegram flood waits map to
+`TELEGRAM_RATE_LIMIT` (429) and invalidated sessions map to `TELEGRAM_SESSION_EXPIRED`
+(409).
+
+**Consequences.** Clients branch on stable codes; the milestone report lists which codes
+appear on which endpoint.

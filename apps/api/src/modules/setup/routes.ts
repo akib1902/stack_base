@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { SetupStatusResponseSchema } from '@stackbase/contracts';
+import { SetupStatusResponseSchema, type StorageProvider } from '@stackbase/contracts';
 import type { Db } from '../../database/db';
 import { authRequired } from '../../errors';
 import { getSetupStatus } from './repository';
 
-export function registerSetupRoutes(app: FastifyInstance, deps: { db: Db }): void {
+export function registerSetupRoutes(
+  app: FastifyInstance,
+  deps: { db: Db; provider: StorageProvider },
+): void {
   app.get(
     '/api/v1/setup/status',
     {
@@ -16,7 +19,7 @@ export function registerSetupRoutes(app: FastifyInstance, deps: { db: Db }): voi
       if (!user) {
         throw authRequired();
       }
-      return getSetupStatus(deps.db, user.id);
+      return getSetupStatus(deps.db, user.id, { provider: deps.provider });
     },
   );
 }

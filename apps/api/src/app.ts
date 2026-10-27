@@ -2,6 +2,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
+import { MAX_PLAINTEXT_CHUNK_SIZE, SECRETSTREAM_ABYTES } from '@stackbase/contracts';
 import type { Config } from './config/env';
 import { ApiError, authRequired } from './errors';
 import { isDatabaseUnavailable, type Db } from './database/db';
@@ -10,7 +11,13 @@ import { registerHealthRoutes } from './modules/health/routes';
 import { registerMeRoutes } from './modules/me/routes';
 import { registerSetupRoutes } from './modules/setup/routes';
 import { registerLibraryRoutes } from './modules/library';
+import { registerEncryptionRoutes } from './modules/encryption/routes';
+import { registerStorageRoutes } from './modules/storage/routes';
+import { registerUploadRoutes } from './modules/uploads/routes';
+import { registerVersionRoutes } from './modules/uploads/version-routes';
 import { registerDevAuthRoutes } from './modules/dev-auth/routes';
+import { createTelegramGateway } from './storage/telegram/gateway';
+import { createTelegramLoginManager } from './storage/telegram/login';
 
 export interface BuildAppOptions {
   config: Config;
@@ -75,6 +82,15 @@ export async function buildApp({
     }),
   });
 
+  // Ciphertext chunks arrive as raw bodies; the chunk route narrows this further.
+  app.addContentTypeParser(
+    'application/octet-stream',
+    { parseAs: 'buffer', bodyLimit: MAX_PLAINTEXT_CHUNK_SIZE + SECRETSTREAM_ABYTES + 1024 },
+    (_request, body, done) => {
+      done(null, body);
+    },
+  );
+
   app.addHook('onSend', async (_request, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
     reply.header('referrer-policy', 'no-referrer');
@@ -117,6 +133,15 @@ export async function buildApp({
       });
     }
 
+    if (error.statusCode === 413) {
+      return reply.status(413).send({
+        error: {
+          code: 'FILE_TOO_LARGE',
+          message: 'The request body exceeds the allowed size for this endpoint.',
+        },
+      });
+    }
+
     if (isDatabaseUnavailable(error)) {
       request.log.error({ err: error }, 'database unavailable');
       return reply.status(503).send({
@@ -144,8 +169,26 @@ export async function buildApp({
 
   registerHealthRoutes(app, { db });
   registerMeRoutes(app, { db });
-  registerSetupRoutes(app, { db });
+  registerSetupRoutes(app, { db, provider: config.storage.provider });
   registerLibraryRoutes(app, { db });
+  registerEncryptionRoutes(app, { db });
+  registerUploadRoutes(app, { db, config });
+  registerVersionRoutes(app, { db, config });
+
+  const logins = createTelegramLoginManager({
+    createGateway: () => {
+      const credentials = config.storage.telegram;
+      if (!credentials) {
+        throw new ApiError(
+          'TELEGRAM_NOT_CONFIGURED',
+          503,
+          'This deployment is not configured for Telegram storage (TELEGRAM_API_ID / TELEGRAM_API_HASH are missing).',
+        );
+      }
+      return createTelegramGateway(credentials);
+    },
+  });
+  registerStorageRoutes(app, { db, config, logins });
 
   // Local development sign-in exists only outside production and only in dev mode.
   if (config.auth.mode === 'dev' && !config.isProduction) {
