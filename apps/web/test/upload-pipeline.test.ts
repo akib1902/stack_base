@@ -17,6 +17,7 @@ import { VAULT_VECTOR } from '../src/lib/crypto/test-vectors';
 import {
   UploadAbortedError,
   createIdempotencyKey,
+  retryDelayMs,
   runUpload,
   type UploadProgress,
   type UploadTransport,
@@ -42,6 +43,9 @@ const VAULT_KEY = hexBytes(VAULT_VECTOR.vaultKeyHex);
 const job = (overrides: Partial<UploadJob> = {}): UploadJob => ({
   id: 'upload-1',
   fileId: 'file-1',
+  idempotencyKey: 'test-key-0001',
+  fileName: 'report.bin',
+  sourceFingerprint: null,
   status: 'transferring',
   sourceSizeBytes: PLAINTEXT_SIZE,
   encryptedSizeBytes: null,
@@ -208,6 +212,9 @@ describe('upload pipeline', () => {
       totalChunks: TOTAL_CHUNKS,
     });
     expect(manifest.plaintextSize).toBe(PLAINTEXT_SIZE);
+    // The job carries the source fingerprint so a reselected file can be
+    // verified before it is allowed onto this job (A5.4).
+    expect(recorded.create[0]!.sourceFingerprint).toBe(sha256(plaintext));
     expect(manifest.ciphertextSize).toBe(PLAINTEXT_SIZE + TOTAL_CHUNKS * 17 + 24);
     expect(Object.keys(manifest)).not.toContain('ciphertextHash');
     expect(Object.keys(manifest)).not.toContain('plaintextFingerprint');
@@ -248,11 +255,17 @@ describe('upload pipeline', () => {
 
   it('resumes a job whose earlier chunks already arrived', async () => {
     const { transport, recorded } = fakeTransport({ receivedChunks: [0] });
-    const outcome = await run(transport);
+    const progress: UploadProgress[] = [];
+    const outcome = await run(transport, { onProgress: (value) => progress.push(value) });
 
     expect(recorded.chunks.map((chunk) => chunk.chunkNumber)).toEqual([1, 2]);
     expect(recorded.finalize).toHaveLength(1);
     expect(outcome.file.id).toBe('file-1');
+    // Confirmed bytes from the earlier attempt count towards the reported
+    // progress, so the bar never jumps backwards on a retry (A5.4).
+    const transfers = progress.filter((value) => value.phase === 'transferring');
+    expect(transfers.map((value) => value.chunksSent)).toEqual([1, 2, 3]);
+    expect(transfers[0]!.ciphertextBytesSent).toBeGreaterThan(0);
   });
 
   it('returns the finished version when the job already completed', async () => {
@@ -282,6 +295,22 @@ describe('upload pipeline', () => {
     expect(recorded.finalize).toHaveLength(0);
   });
 
+  it('keeps the job when the abort reason is a pause', async () => {
+    const controller = new AbortController();
+    const { transport, recorded } = fakeTransport({
+      beforeChunk: (chunkNumber) => {
+        if (chunkNumber === 1) controller.abort('pause');
+      },
+    });
+
+    await expect(run(transport, { signal: controller.signal })).rejects.toBeInstanceOf(
+      UploadAbortedError,
+    );
+    // Pausing must not cancel server-side: staged chunks stay for a resume.
+    expect(recorded.cancels).toEqual([]);
+    expect(recorded.finalize).toHaveLength(0);
+  });
+
   it('surfaces a chunk failure with its own message and does not finalize', async () => {
     const { transport, recorded } = fakeTransport({ failOnChunk: 1 });
     await expect(run(transport)).rejects.toThrowError('Chunk 1 rejected.');
@@ -289,6 +318,20 @@ describe('upload pipeline', () => {
     expect(recorded.chunks.map((chunk) => chunk.chunkNumber)).toEqual([0]);
     // A failed transfer is not a cancellation: the staging data stays for a retry.
     expect(recorded.cancels).toEqual([]);
+  });
+
+  it('backs off exponentially with jitter for transient retries (A5.5)', () => {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      const base = Math.min(8000, 500 * 2 ** (attempt - 1));
+      const delay = retryDelayMs(attempt);
+      expect(delay).toBeGreaterThanOrEqual(Math.round(base * 0.7));
+      expect(delay).toBeLessThanOrEqual(Math.round(base * 1.3));
+    }
+    // The ceiling holds no matter how late the attempt is.
+    expect(retryDelayMs(50)).toBeLessThanOrEqual(Math.round(8000 * 1.3));
+    // Jitter: identical attempts must not produce identical delays.
+    const samples = new Set([retryDelayMs(4), retryDelayMs(4), retryDelayMs(4), retryDelayMs(4)]);
+    expect(samples.size).toBeGreaterThan(1);
   });
 
   it('builds unique idempotency keys', () => {

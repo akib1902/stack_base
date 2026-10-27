@@ -1,6 +1,17 @@
 'use client';
 
-import { CheckCircle2, ChevronDown, CircleAlert, Loader2, UploadCloud, X } from 'lucide-react';
+import { useRef } from 'react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  CircleAlert,
+  FileWarning,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils/cn';
 import { formatBytes } from '@/lib/utils/format';
@@ -9,7 +20,8 @@ import { useUploads, type UploadItem } from './upload-context';
 /**
  * The queue lives in one place (bottom right, above the mobile navigation) and
  * reports per-file truth: encrypted locally, transferred chunk by chunk (server
- * confirmed), or failed with the server's own reason and a resume-capable retry.
+ * confirmed), paused with its stored chunks kept, or interrupted by a refresh
+ * and waiting for its source file to be picked again (A5.4).
  */
 
 const ACTIVE: ReadonlySet<UploadItem['status']> = new Set([
@@ -17,6 +29,12 @@ const ACTIVE: ReadonlySet<UploadItem['status']> = new Set([
   'encrypting',
   'transferring',
   'finalizing',
+]);
+
+const SHOW_PROGRESS: ReadonlySet<UploadItem['status']> = new Set([
+  ...ACTIVE,
+  'paused',
+  'needs_source_file',
 ]);
 
 function StatusIcon({ status }: { status: UploadItem['status'] }) {
@@ -29,7 +47,106 @@ function StatusIcon({ status }: { status: UploadItem['status'] }) {
   if (status === 'cancelled') {
     return <X className="size-4 shrink-0 text-muted" aria-hidden="true" />;
   }
+  if (status === 'paused') {
+    return <PauseCircle className="size-4 shrink-0 text-primary" aria-hidden="true" />;
+  }
+  if (status === 'needs_source_file') {
+    return <FileWarning className="size-4 shrink-0 text-warning" aria-hidden="true" />;
+  }
   return <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />;
+}
+
+function RowActions({ item }: { item: UploadItem }) {
+  const uploads = useUploads();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {ACTIVE.has(item.status) ? (
+        <>
+          <button
+            type="button"
+            onClick={() => uploads.pause(item.id)}
+            className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+          >
+            Pause
+          </button>
+          <button
+            type="button"
+            onClick={() => uploads.cancel(item.id)}
+            className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </>
+      ) : null}
+
+      {item.status === 'paused' ? (
+        <>
+          <Button type="button" variant="secondary" size="sm" onClick={() => uploads.resume(item.id)}>
+            <PlayCircle className="size-3.5" aria-hidden="true" />
+            Resume
+          </Button>
+          <button
+            type="button"
+            onClick={() => uploads.cancel(item.id)}
+            className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </>
+      ) : null}
+
+      {item.status === 'needs_source_file' ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void uploads.reselect(item.id, file);
+            }}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose file
+          </Button>
+          <button
+            type="button"
+            onClick={() => uploads.cancel(item.id)}
+            className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </>
+      ) : null}
+
+      {item.status === 'failed' && item.retryable ? (
+        <Button type="button" variant="secondary" size="sm" onClick={() => uploads.retry(item.id)}>
+          Retry
+        </Button>
+      ) : null}
+
+      {item.status === 'completed' || item.status === 'cancelled' || item.status === 'failed' ? (
+        <button
+          type="button"
+          onClick={() => uploads.dismiss(item.id)}
+          aria-label={`Dismiss ${item.name}`}
+          className="grid size-7 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 export function UploadPanel() {
@@ -84,40 +201,10 @@ export function UploadPanel() {
                   </p>
                 ) : null}
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                {ACTIVE.has(item.status) ? (
-                  <button
-                    type="button"
-                    onClick={() => uploads.cancel(item.id)}
-                    className="rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                ) : null}
-                {item.status === 'failed' ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => uploads.retry(item.id)}
-                  >
-                    Retry
-                  </Button>
-                ) : null}
-                {item.status === 'completed' || item.status === 'cancelled' ? (
-                  <button
-                    type="button"
-                    onClick={() => uploads.dismiss(item.id)}
-                    aria-label={`Dismiss ${item.name}`}
-                    className="grid size-7 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  >
-                    <X className="size-3.5" aria-hidden="true" />
-                  </button>
-                ) : null}
-              </div>
+              <RowActions item={item} />
             </div>
 
-            {ACTIVE.has(item.status) ? (
+            {SHOW_PROGRESS.has(item.status) ? (
               <div
                 role="progressbar"
                 aria-valuemin={0}

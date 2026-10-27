@@ -12,6 +12,7 @@ import {
 } from '@/features/library/actions';
 import { CATEGORY_META } from '@/features/library/category-meta';
 import { folderOptionLabel } from '@/features/library/params';
+import { FilePreview } from '@/features/previews/file-preview';
 import { DownloadFileButton } from '@/features/uploads/download-button';
 import { formatBytes, formatDateTime } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
@@ -168,6 +169,9 @@ export function FileDetailsDialog({
     >
       <div className="space-y-5">
         <FormError message={error} />
+
+        {/* Decrypts in this tab on open; nothing is requested while closed. */}
+        {open ? <FilePreview file={file} /> : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">

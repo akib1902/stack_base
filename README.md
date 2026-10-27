@@ -6,14 +6,16 @@ files are encrypted in the browser so the server never sees plaintext.
 
 The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 
-> **Status: Milestone 3 — encrypted storage and the upload pipeline.** Authentication,
+> **Status: Milestone 4 — upload reliability and previews.** Authentication,
 > owner-scoped authorization, the full database schema with row-level security, the
 > metadata library, the `stackbase/1` client-side encryption format, provider-neutral
 > storage (local filesystem + Telegram MTProto), chunked encrypted uploads with
-> immutable versions and browser-side download/decryption are implemented and tested.
-> Previews, sharing, offline/PWA, resume controls and the Supabase sign-in screen are
-> **not** implemented yet; the UI never pretends otherwise. See the
-> [Milestone 3 report](docs/reports/milestone-3.md) and the
+> immutable versions, browser-side download/decryption, a durable queue that survives a
+> page refresh (pause/resume/retry with backoff and source-file reselection),
+> image/video/audio/PDF previews decrypted in the tab, and storage insights are
+> implemented and tested. Sharing, versions UI, offline/PWA and the Supabase sign-in
+> screen are **not** implemented yet; the UI never pretends otherwise. See the
+> [Milestone 4 report](docs/reports/milestone-4.md) and the
 > [encryption format](docs/architecture/encryption-format.md).
 
 ---

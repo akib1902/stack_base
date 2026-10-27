@@ -357,7 +357,12 @@ API directly.
 
 **Consequences.** Bounded memory on both sides (1 MiB chunks end-to-end). The server disk
 holds ciphertext only, briefly, under the documented directory and cleanup rules. Resume
-after refresh remains Milestone 4 work.
+after refresh (Milestone 4) reuses this state: `GET /api/v1/uploads` returns every
+unfinished job with its replay key, received chunk numbers and the client-declared
+`source_fingerprint`; a job nobody has touched for two minutes (fifteen while
+finalizing) is swept to `needs_source_file`, and the browser re-picks the source file,
+verifies its fingerprint against the stored one and continues from the chunks that
+already arrived.
 
 ---
 

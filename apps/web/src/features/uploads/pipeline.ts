@@ -9,7 +9,7 @@ import type {
   FinalizeUploadResponse,
   UploadChunkResponse,
 } from '@stackbase/contracts';
-import { startEncryption, type ByteSource } from '@/lib/crypto/file-format';
+import { fingerprintSource, startEncryption, type ByteSource } from '@/lib/crypto/file-format';
 
 /**
  * One upload from end to end: generate the data key and stream header, create
@@ -62,6 +62,8 @@ export interface UploadOutcome {
 
 export interface UploadHooks {
   onProgress?: (progress: UploadProgress) => void;
+  /** Called once the job exists server-side, so the UI can act on its id. */
+  onCreated?: (uploadId: string) => void;
   signal?: AbortSignal;
 }
 
@@ -105,12 +107,16 @@ export async function runUpload(
   });
 
   abortIfNeeded();
+  // Content fingerprint of the source, stored on the job so a reselected file
+  // can be compared before it is allowed onto this job (A5.4).
+  const sourceFingerprint = await fingerprintSource(input.source);
   const created = await transport.create({
     idempotencyKey: input.idempotencyKey,
     name: input.name,
     mimeType: input.mimeType,
     folderId: input.folderId,
     manifest: session.manifest,
+    sourceFingerprint,
   });
 
   // Replaying an idempotency key can hit a job that already finished.
@@ -125,6 +131,7 @@ export async function runUpload(
 
   const uploadId = created.upload.id;
   const alreadyReceived = new Set(created.upload.receivedChunkNumbers);
+  hooks.onCreated?.(uploadId);
 
   try {
     const iterator = session.encrypt();
@@ -135,7 +142,12 @@ export async function runUpload(
     while (!step.done) {
       abortIfNeeded();
       const chunk = step.value;
-      if (!alreadyReceived.has(chunk.chunkNumber)) {
+      if (alreadyReceived.has(chunk.chunkNumber)) {
+        // A previous attempt already delivered it: count it so the progress
+        // reported to the user reflects confirmed bytes, not just new ones.
+        bytesSent += chunk.data.length;
+        chunksSent = Math.max(chunksSent, alreadyReceived.size);
+      } else {
         const response = await transport.putChunk(
           uploadId,
           chunk.chunkNumber,
@@ -144,15 +156,15 @@ export async function runUpload(
         );
         chunksSent = response.upload.receivedChunks;
         bytesSent += chunk.data.length;
-        hooks.onProgress?.({
-          phase: 'transferring',
-          chunksSent,
-          totalChunks: session.totalChunks,
-          ciphertextBytesSent: bytesSent,
-          ciphertextSizeBytes: session.manifest.ciphertextSize,
-          sourceBytes: session.manifest.plaintextSize,
-        });
       }
+      hooks.onProgress?.({
+        phase: 'transferring',
+        chunksSent,
+        totalChunks: session.totalChunks,
+        ciphertextBytesSent: bytesSent,
+        ciphertextSizeBytes: session.manifest.ciphertextSize,
+        sourceBytes: session.manifest.plaintextSize,
+      });
       step = await iterator.next();
     }
 
@@ -171,8 +183,11 @@ export async function runUpload(
     return { file: finalized.file, version: finalized.version };
   } catch (error) {
     if (error instanceof UploadAbortedError) {
-      // Best effort: a cancelled job must not keep staging bytes around.
-      await transport.cancel(uploadId).catch(() => undefined);
+      // Best effort: a cancelled job must not keep staging bytes around —
+      // unless the abort was a pause, which must leave the job intact (A5.4).
+      if (signal?.reason !== 'pause') {
+        await transport.cancel(uploadId).catch(() => undefined);
+      }
     }
     throw error;
   }
@@ -184,4 +199,14 @@ export function createIdempotencyKey(): string {
     return crypto.randomUUID();
   }
   return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * Exponential backoff with jitter for transient upload failures (A5.5):
+ * 500 ms doubling to a ceiling of 8 seconds, spread by ±30 % so a batch of
+ * interrupted uploads does not retry in lockstep.
+ */
+export function retryDelayMs(attempt: number): number {
+  const base = Math.min(8000, 500 * 2 ** Math.max(0, attempt - 1));
+  return Math.round(base * (0.7 + Math.random() * 0.6));
 }

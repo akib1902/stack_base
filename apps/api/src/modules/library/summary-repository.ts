@@ -1,5 +1,6 @@
 import {
   LIBRARY_CATEGORIES,
+  type CategorySummary,
   type LibraryCategory,
   type LibrarySummaryResponse,
   type SearchResponse,
@@ -35,8 +36,35 @@ const EMPTY_TOTALS: LibrarySummaryResponse['totals'] = {
 };
 
 /**
+ * Category aggregates for the caller's live files. Empty categories are
+ * returned explicitly so tiles and charts are stable between loads.
+ */
+export async function readCategoryTotals(db: Db, userId: string): Promise<CategorySummary[]> {
+  const { rows } = await db.query<CategoryRow>(
+    `select category, count(*)::int as files, coalesce(sum(size), 0)::bigint as bytes
+        from (
+          select ${categoryExpression('f')} as category, f.logical_size_bytes as size
+          from public.files f
+          where f.user_id = $1 and f.deleted_at is null
+        ) classified
+        group by category`,
+    [userId],
+  );
+  const byCategory = new Map(
+    rows.map((row) => [
+      row.category,
+      { files: toCount(row.files), bytes: toCount(row.bytes) },
+    ]),
+  );
+  return LIBRARY_CATEGORIES.map((category) => ({
+    category,
+    files: byCategory.get(category)?.files ?? 0,
+    bytes: byCategory.get(category)?.bytes ?? 0,
+  }));
+}
+
+/**
  * Everything the bento grid needs, read from the caller's own rows in one call.
- * Empty categories are returned explicitly so tiles are stable between loads.
  */
 export async function getLibrarySummary(
   db: Db,
@@ -54,27 +82,12 @@ export async function getLibrarySummary(
         (select count(*)::int from public.folders where user_id = $1 and deleted_at is not null) as "trashedFolders"`,
       [userId],
     ),
-    db.query<CategoryRow>(
-      `select category, count(*)::int as files, coalesce(sum(size), 0)::bigint as bytes
-        from (
-          select ${categoryExpression('f')} as category, f.logical_size_bytes as size
-          from public.files f
-          where f.user_id = $1 and f.deleted_at is null
-        ) classified
-        group by category`,
-      [userId],
-    ),
+    readCategoryTotals(db, userId),
     listFileSummaries(db, userId, { sort: 'updated_at', limit: 5 }),
     listFileSummaries(db, userId, { sort: 'size_desc', limit: 5 }),
   ]);
 
   const totalsRow = totals.rows[0];
-  const byCategory = new Map(
-    categories.rows.map((row) => [
-      row.category,
-      { files: toCount(row.files), bytes: toCount(row.bytes) },
-    ]),
-  );
 
   return {
     totals: totalsRow
@@ -87,11 +100,7 @@ export async function getLibrarySummary(
           trashedFolders: toCount(totalsRow.trashedFolders),
         }
       : EMPTY_TOTALS,
-    categories: LIBRARY_CATEGORIES.map((category) => ({
-      category,
-      files: byCategory.get(category)?.files ?? 0,
-      bytes: byCategory.get(category)?.bytes ?? 0,
-    })),
+    categories,
     recent,
     largest,
   };

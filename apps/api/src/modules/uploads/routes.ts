@@ -9,8 +9,10 @@ import {
   MAX_PLAINTEXT_CHUNK_SIZE,
   SECRETSTREAM_ABYTES,
   UPLOAD_CHUNK_CHECKSUM_HEADER,
+  UploadActionResponseSchema,
   UploadChunkResponseSchema,
   UploadJobSchema,
+  UploadListResponseSchema,
 } from '@stackbase/contracts';
 import type { Config } from '../../config/env';
 import type { Db } from '../../database/db';
@@ -20,14 +22,18 @@ import {
   createUpload,
   finalizeUpload,
   getUpload,
+  listUploads,
+  pauseUpload,
   receiveChunk,
+  resumeUpload,
+  retryUpload,
 } from './repository';
 
 /**
- * Upload endpoints (A10). Resume, retry and pause actions are Milestone 4;
- * this milestone accepts the full chunk set, verifies it end to end and
- * finalizes the immutable version. Replaying an idempotency key returns the
- * same job, and finalizing twice returns the same version.
+ * Upload endpoints (A10). The queue is durable: `GET /uploads` restores it
+ * after a refresh, pause/resume/retry drive the documented state machine, and
+ * this API still only ever sees ciphertext chunks. Replaying an idempotency key
+ * returns the same job, and finalizing twice returns the same version.
  */
 
 const UploadParams = Type.Object({ uploadId: Type.String({ minLength: 1, maxLength: 36 }) });
@@ -53,6 +59,19 @@ export function registerUploadRoutes(app: FastifyInstance, deps: { db: Db; confi
       const user = request.user;
       if (!user) throw authRequired();
       return createUpload(deps, user.id, request.body);
+    },
+  );
+
+  app.get(
+    '/api/v1/uploads',
+    {
+      preHandler: app.authenticate,
+      schema: { response: { 200: UploadListResponseSchema } },
+    },
+    async (request) => {
+      const user = request.user;
+      if (!user) throw authRequired();
+      return { items: await listUploads(deps.db, user.id) };
     },
   );
 
@@ -142,4 +161,26 @@ export function registerUploadRoutes(app: FastifyInstance, deps: { db: Db; confi
       return cancelUpload(deps, user.id, request.params.uploadId);
     },
   );
+
+  for (const [path, action] of [
+    ['pause', pauseUpload],
+    ['resume', resumeUpload],
+    ['retry', retryUpload],
+  ] as const) {
+    app.post<{ Params: UploadParamsType }>(
+      `/api/v1/uploads/:uploadId/${path}`,
+      {
+        preHandler: app.authenticate,
+        schema: {
+          params: UploadParams,
+          response: { 200: UploadActionResponseSchema },
+        },
+      },
+      async (request) => {
+        const user = request.user;
+        if (!user) throw authRequired();
+        return { upload: await action(deps.db, user.id, request.params.uploadId) };
+      },
+    );
+  }
 }

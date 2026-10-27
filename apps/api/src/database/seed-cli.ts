@@ -5,11 +5,11 @@ import { openDb, type Db } from './db';
 import { runMigrations } from './migrations';
 
 /**
- * Development fixtures. Files normally enter the library through the encrypted
- * upload pipeline, which ships in the storage milestone; until then this command
- * gives a local database realistic metadata so the file manager can be exercised
- * end to end. It refuses to run in production and never touches another
- * account's rows.
+ * Development fixtures. Real files enter the library through the encrypted upload
+ * pipeline (Milestone 3); this command only seeds metadata — folders, tags and
+ * file records without content — so the file manager can be exercised without
+ * transferring any bytes. It refuses to run in production and never touches
+ * another account's rows.
  */
 
 interface SeedFolder {

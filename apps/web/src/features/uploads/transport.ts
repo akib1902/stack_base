@@ -7,7 +7,9 @@ import {
   type FileVersionListResponse,
   type FinalizeUploadRequest,
   type FinalizeUploadResponse,
+  type UploadActionResponse,
   type UploadChunkResponse,
+  type UploadListResponse,
 } from '@stackbase/contracts';
 import { sendJson, sendRaw } from '@/lib/api/browser';
 import type { UploadTransport } from './pipeline';
@@ -50,5 +52,25 @@ export const uploadTransport: UploadTransport = {
   listVersions: (fileId: string) =>
     sendJson<FileVersionListResponse>(`/api/files/${encodeURIComponent(fileId)}/versions`, {
       method: 'GET',
+    }),
+};
+
+/** Queue-restore and job-state actions (A5.4/A5.5); separate from the transfer path. */
+export const uploadJobTransport = {
+  list: () => sendJson<UploadListResponse>('/api/uploads', { method: 'GET' }),
+
+  pause: (uploadId: string) =>
+    sendJson<UploadActionResponse>(`/api/uploads/${encodeURIComponent(uploadId)}/pause`, {
+      method: 'POST',
+    }),
+
+  resume: (uploadId: string) =>
+    sendJson<UploadActionResponse>(`/api/uploads/${encodeURIComponent(uploadId)}/resume`, {
+      method: 'POST',
+    }),
+
+  retry: (uploadId: string) =>
+    sendJson<UploadActionResponse>(`/api/uploads/${encodeURIComponent(uploadId)}/retry`, {
+      method: 'POST',
     }),
 };

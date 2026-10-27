@@ -57,6 +57,10 @@ interface UploadRow {
   id: string;
   fileId: string | null;
   storageConnectionId: string;
+  idempotencyKey: string;
+  sourceFingerprint: string | null;
+  /** Joined from the file row; null when the insert path has not read it back. */
+  fileName: string | null;
   status: UploadJob['status'];
   sourceSizeBytes: unknown;
   encryptedSizeBytes: unknown;
@@ -72,24 +76,33 @@ interface UploadRow {
   cancelledAt: unknown;
 }
 
-const JOB_COLUMNS = `
-  id,
-  file_id as "fileId",
-  storage_connection_id as "storageConnectionId",
-  status,
-  source_size_bytes as "sourceSizeBytes",
-  encrypted_size_bytes as "encryptedSizeBytes",
-  chunk_size_bytes as "chunkSizeBytes",
-  total_chunks as "totalChunks",
-  received_chunks as "receivedChunks",
-  retry_count as "retryCount",
-  last_error_code as "lastErrorCode",
-  manifest,
-  created_at as "createdAt",
-  updated_at as "updatedAt",
-  completed_at as "completedAt",
-  cancelled_at as "cancelledAt"
+/**
+ * One column list, two spellings: inserts return unqualified columns, reads
+ * qualify them with `j.` because the query joins `files` for the name (both
+ * tables carry `id`, `created_at` and `updated_at`).
+ */
+const jobColumns = (qualifier: '' | 'j.'): string => `
+  ${qualifier}id,
+  ${qualifier}file_id as "fileId",
+  ${qualifier}storage_connection_id as "storageConnectionId",
+  ${qualifier}idempotency_key as "idempotencyKey",
+  ${qualifier}source_fingerprint as "sourceFingerprint",
+  ${qualifier}status,
+  ${qualifier}source_size_bytes as "sourceSizeBytes",
+  ${qualifier}encrypted_size_bytes as "encryptedSizeBytes",
+  ${qualifier}chunk_size_bytes as "chunkSizeBytes",
+  ${qualifier}total_chunks as "totalChunks",
+  ${qualifier}received_chunks as "receivedChunks",
+  ${qualifier}retry_count as "retryCount",
+  ${qualifier}last_error_code as "lastErrorCode",
+  ${qualifier}manifest,
+  ${qualifier}created_at as "createdAt",
+  ${qualifier}updated_at as "updatedAt",
+  ${qualifier}completed_at as "completedAt",
+  ${qualifier}cancelled_at as "cancelledAt"
 `;
+
+const JOB_COLUMNS = jobColumns('');
 
 const uploadNotFound = (): ApiError =>
   new ApiError('UPLOAD_NOT_FOUND', 404, 'That upload does not exist.');
@@ -133,6 +146,9 @@ function mapJob(row: UploadRow, receivedChunkNumbers: number[]): UploadJob {
   return {
     id: row.id,
     fileId: row.fileId,
+    idempotencyKey: row.idempotencyKey,
+    fileName: row.fileName,
+    sourceFingerprint: row.sourceFingerprint,
     status: row.status,
     sourceSizeBytes: toCount(row.sourceSizeBytes),
     encryptedSizeBytes:
@@ -152,11 +168,16 @@ function mapJob(row: UploadRow, receivedChunkNumbers: number[]): UploadJob {
   };
 }
 
+/** Reads join the file name so a restored queue can label its rows itself. */
+const JOB_READ = `
+  select ${jobColumns('j.')}, f.name as "fileName"
+    from public.upload_jobs j
+    left join public.files f on f.id = j.file_id and f.user_id = j.user_id
+   where j.user_id = $1
+`;
+
 async function loadJob(db: Db | Queryable, userId: string, uploadId: string): Promise<UploadRow | null> {
-  const { rows } = await db.query<UploadRow>(
-    `select ${JOB_COLUMNS} from public.upload_jobs where user_id = $1 and id = $2`,
-    [userId, uploadId],
-  );
+  const { rows } = await db.query<UploadRow>(`${JOB_READ} and j.id = $2`, [userId, uploadId]);
   return rows[0] ?? null;
 }
 
@@ -165,10 +186,10 @@ async function loadJobByKey(
   userId: string,
   idempotencyKey: string,
 ): Promise<UploadRow | null> {
-  const { rows } = await db.query<UploadRow>(
-    `select ${JOB_COLUMNS} from public.upload_jobs where user_id = $1 and idempotency_key = $2`,
-    [userId, idempotencyKey],
-  );
+  const { rows } = await db.query<UploadRow>(`${JOB_READ} and j.idempotency_key = $2`, [
+    userId,
+    idempotencyKey,
+  ]);
   return rows[0] ?? null;
 }
 
@@ -305,7 +326,12 @@ async function respondWithExisting(
   const matches =
     job.sourceSizeBytes === input.manifest.plaintextSize &&
     job.chunkSizeBytes === input.manifest.chunking.plaintextChunkSize &&
-    job.totalChunks === input.manifest.chunking.totalChunks;
+    job.totalChunks === input.manifest.chunking.totalChunks &&
+    // A replayed key with a different source fingerprint is a different file:
+    // it must never be stitched onto the half-finished job (A5.4).
+    (input.sourceFingerprint === undefined ||
+      job.sourceFingerprint === null ||
+      job.sourceFingerprint === input.sourceFingerprint);
   if (!matches) {
     throw new ApiError(
       'UPLOAD_STATE_CONFLICT',
@@ -398,8 +424,9 @@ export async function createUpload(
       const job = await tx.query<UploadRow>(
         `insert into public.upload_jobs
            (user_id, file_id, storage_connection_id, idempotency_key, status,
-            source_size_bytes, encrypted_size_bytes, chunk_size_bytes, total_chunks, manifest)
-         values ($1, $2, $3, $4, 'transferring', $5, $6, $7, $8, $9::jsonb)
+            source_size_bytes, source_fingerprint, encrypted_size_bytes,
+            chunk_size_bytes, total_chunks, manifest)
+         values ($1, $2, $3, $4, 'transferring', $5, $6, $7, $8, $9, $10::jsonb)
          returning ${JOB_COLUMNS}`,
         [
           userId,
@@ -407,6 +434,7 @@ export async function createUpload(
           connectionId,
           input.idempotencyKey,
           input.manifest.plaintextSize,
+          input.sourceFingerprint ?? null,
           input.manifest.ciphertextSize,
           input.manifest.chunking.plaintextChunkSize,
           input.manifest.chunking.totalChunks,
@@ -417,7 +445,8 @@ export async function createUpload(
       if (!row) {
         throw new ApiError('INTERNAL_ERROR', 500, 'The upload job could not be created.');
       }
-      return { job: row, fileId };
+      // The insert cannot join; the file row was just written with this name.
+      return { job: { ...row, fileName: name }, fileId };
     });
   } catch (error) {
     // A concurrent replay of the same key wins the unique constraint; return it.
@@ -873,11 +902,135 @@ export async function getUpload(
   userId: string,
   uploadId: string,
 ): Promise<UploadJob> {
+  await sweepStaleJobs(db, userId);
   const row = await loadJob(db, userId, uploadId);
   if (!row) {
     throw uploadNotFound();
   }
   return mapJob(row, await stagedChunkNumbers(db, uploadId));
+}
+
+// ---------------------------------------------------------------------------
+// Queue restore, pause, resume and retry (A5.4, A5.5)
+// ---------------------------------------------------------------------------
+
+/** Statuses in which the client, not a worker, drives the job forward. */
+const CLIENT_DRIVEN: readonly UploadJob['status'][] = [
+  'queued',
+  'preparing',
+  'encrypting',
+  'transferring',
+  'retrying',
+];
+
+/**
+ * Only the browser moves an open job, so a row nobody has touched is genuinely
+ * interrupted — a refresh, a closed tab, a sleeping laptop. The sweep runs on
+ * every read and converts that into an explicit state the queue can act on
+ * instead of a job that looks alive forever. `finalizing` gets a much longer
+ * grace period because a provider transfer legitimately runs without chunk
+ * traffic (A5.4).
+ */
+async function sweepStaleJobs(db: Db | Queryable, userId: string): Promise<void> {
+  await db.query(
+    `update public.upload_jobs
+        set status = case when status = 'finalizing'
+                          then 'reconciliation_required' else 'needs_source_file' end,
+            last_error_code = case when status = 'finalizing'
+                          then 'STORAGE_RECONCILIATION_REQUIRED' else 'UPLOAD_SOURCE_REQUIRED' end
+      where user_id = $1
+        and status in ('queued', 'preparing', 'encrypting', 'transferring', 'retrying', 'finalizing')
+        and updated_at < now() - (case when status = 'finalizing' then 15 else 2 end)
+                            * interval '1 minute'`,
+    [userId],
+  );
+}
+
+/** Every unfinished job, newest first, so a reloaded browser can restore its queue. */
+export async function listUploads(db: Db, userId: string): Promise<UploadJob[]> {
+  await sweepStaleJobs(db, userId);
+  const { rows } = await db.query<UploadRow>(
+    `${JOB_READ}
+       and j.status not in ('completed', 'cancelled')
+     order by j.created_at desc
+     limit 50`,
+    [userId],
+  );
+  const jobs: UploadJob[] = [];
+  for (const row of rows) {
+    jobs.push(mapJob(row, await stagedChunkNumbers(db, row.id)));
+  }
+  return jobs;
+}
+
+async function respondJob(db: Db, userId: string, uploadId: string): Promise<UploadJob> {
+  const row = await loadJob(db, userId, uploadId);
+  if (!row) throw uploadNotFound();
+  return mapJob(row, await stagedChunkNumbers(db, uploadId));
+}
+
+export async function pauseUpload(db: Db, userId: string, uploadId: string): Promise<UploadJob> {
+  const row = await loadJob(db, userId, uploadId);
+  if (!row) throw uploadNotFound();
+  if (row.status === 'paused') return respondJob(db, userId, uploadId);
+  if (!CLIENT_DRIVEN.includes(row.status)) {
+    throw new ApiError(
+      'UPLOAD_STATE_CONFLICT',
+      409,
+      `This upload is "${row.status}" and cannot be paused.`,
+    );
+  }
+  await db.query(
+    `update public.upload_jobs set status = 'paused' where user_id = $1 and id = $2`,
+    [userId, uploadId],
+  );
+  return respondJob(db, userId, uploadId);
+}
+
+export async function resumeUpload(db: Db, userId: string, uploadId: string): Promise<UploadJob> {
+  const row = await loadJob(db, userId, uploadId);
+  if (!row) throw uploadNotFound();
+  if (row.status === 'paused') {
+    // "retrying" is the state that accepts chunks again; no chunk is resent.
+    await db.query(
+      `update public.upload_jobs set status = 'retrying' where user_id = $1 and id = $2`,
+      [userId, uploadId],
+    );
+    return respondJob(db, userId, uploadId);
+  }
+  if (CLIENT_DRIVEN.includes(row.status)) return respondJob(db, userId, uploadId);
+  throw new ApiError(
+    'UPLOAD_STATE_CONFLICT',
+    409,
+    `This upload is "${row.status}"; use retry, or start a new upload.`,
+  );
+}
+
+export async function retryUpload(db: Db, userId: string, uploadId: string): Promise<UploadJob> {
+  const row = await loadJob(db, userId, uploadId);
+  if (!row) throw uploadNotFound();
+  if (CLIENT_DRIVEN.includes(row.status)) return respondJob(db, userId, uploadId);
+  if (row.status === 'failed' || row.status === 'needs_source_file' || row.status === 'paused') {
+    await db.query(
+      `update public.upload_jobs
+          set status = 'retrying', retry_count = retry_count + 1
+        where user_id = $1 and id = $2`,
+      [userId, uploadId],
+    );
+    return respondJob(db, userId, uploadId);
+  }
+  if (row.status === 'reconciliation_required') {
+    throw new ApiError(
+      'STORAGE_RECONCILIATION_REQUIRED',
+      409,
+      'This upload stopped inside provider finalisation. Run storage reconciliation before retrying it.',
+    );
+  }
+  throw new ApiError(
+    'UPLOAD_STATE_CONFLICT',
+    409,
+    `This upload is "${row.status}" and cannot be retried.`,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -88,6 +88,23 @@ function createHasher(sodium: Sodium): Hasher {
 const isHex64 = (value: string): boolean => new RegExp(SHA256_HEX_PATTERN).test(value);
 
 /**
+ * SHA-256 of a byte source, streamed in bounded slices so a large file never
+ * has to sit in memory. This is the `source_fingerprint` (A5.4): the value a
+ * reselected file is compared against before it is allowed onto a half-finished
+ * job.
+ */
+export async function fingerprintSource(source: ByteSource): Promise<string> {
+  const sodium = await getSodium();
+  const hasher = createHasher(sodium);
+  const step = DEFAULT_PLAINTEXT_CHUNK_SIZE;
+  for (let start = 0; start < source.size; start += step) {
+    const end = Math.min(source.size, start + step);
+    hasher.update(new Uint8Array(await source.slice(start, end).arrayBuffer()));
+  }
+  return hasher.final();
+}
+
+/**
  * Client-side mirror of the server's manifest validation (format section 4).
  * A manifest that fails here is never used for encryption or decryption.
  */

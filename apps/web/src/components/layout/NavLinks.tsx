@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  BarChart3,
   Clock,
   FolderOpen,
   Home,
@@ -32,6 +33,7 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 const SECONDARY_NAV: NavItem[] = [
+  { href: '/insights', label: 'Storage insights', icon: BarChart3, available: true },
   { href: '/uploads', label: 'Uploads', icon: Upload, available: false },
   { href: '/settings', label: 'Settings', icon: Settings, available: true },
 ];

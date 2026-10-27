@@ -6,3 +6,4 @@ export * from './library';
 export * from './encryption';
 export * from './storage';
 export * from './uploads';
+export * from './insights';

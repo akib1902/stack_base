@@ -157,6 +157,20 @@ export type UploadJobStatus = Static<typeof UploadJobStatusSchema>;
 export const UploadJobSchema = Type.Object({
   id: Type.String(),
   fileId: Type.Union([Type.String(), Type.Null()]),
+  /**
+   * Replay of this key resumes the same job instead of creating another one
+   * (A5.3). The queue restore in Milestone 4 hands it back to the client so a
+   * refreshed browser continues where it stopped.
+   */
+  idempotencyKey: Type.String({ minLength: 8, maxLength: 200 }),
+  /** Name of the file this job will produce; null only if the file row is gone. */
+  fileName: Type.Union([Type.String(), Type.Null()]),
+  /**
+   * SHA-256 of the source file, computed by the client before the first byte is
+   * sent (A5.4). Reselection compares it so a different file can never be
+   * stitched onto a half-finished job.
+   */
+  sourceFingerprint: Type.Union([sha256Hex(), Type.Null()]),
   status: UploadJobStatusSchema,
   sourceSizeBytes: Type.Integer({ minimum: 0 }),
   encryptedSizeBytes: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
@@ -212,6 +226,8 @@ export const CreateUploadRequestSchema = Type.Object(
     mimeType: Type.String({ minLength: 1, maxLength: 255 }),
     folderId: Type.Optional(Type.Union([Type.String({ maxLength: 36 }), Type.Null()])),
     manifest: UploadManifestSchema,
+    /** Optional for tooling; the app always sends it so resume can verify the file. */
+    sourceFingerprint: Type.Optional(sha256Hex()),
   },
   { additionalProperties: false },
 );
@@ -252,3 +268,15 @@ export const CancelUploadResponseSchema = Type.Object({
   upload: UploadJobSchema,
 });
 export type CancelUploadResponse = Static<typeof CancelUploadResponseSchema>;
+
+/** `GET /api/v1/uploads` — everything not yet finished, newest first (A5.4). */
+export const UploadListResponseSchema = Type.Object({
+  items: Type.Array(UploadJobSchema),
+});
+export type UploadListResponse = Static<typeof UploadListResponseSchema>;
+
+/** Shared shape of the pause, resume and retry endpoints (A10). */
+export const UploadActionResponseSchema = Type.Object({
+  upload: UploadJobSchema,
+});
+export type UploadActionResponse = Static<typeof UploadActionResponseSchema>;
