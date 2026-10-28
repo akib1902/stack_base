@@ -15,6 +15,9 @@ import { registerEncryptionRoutes } from './modules/encryption/routes';
 import { registerStorageRoutes } from './modules/storage/routes';
 import { registerUploadRoutes } from './modules/uploads/routes';
 import { registerVersionRoutes } from './modules/uploads/version-routes';
+import { registerVersionRestoreRoutes } from './modules/versions/routes';
+import { registerShareRoutes } from './modules/shares/routes';
+import { registerAuditRoutes } from './modules/audit/routes';
 import { registerDevAuthRoutes } from './modules/dev-auth/routes';
 import { createTelegramGateway } from './storage/telegram/gateway';
 import { createTelegramLoginManager } from './storage/telegram/login';
@@ -173,10 +176,13 @@ export async function buildApp({
   registerHealthRoutes(app, { db });
   registerMeRoutes(app, { db });
   registerSetupRoutes(app, { db, provider: config.storage.provider });
-  registerLibraryRoutes(app, { db });
+  registerLibraryRoutes(app, { db, config });
   registerEncryptionRoutes(app, { db });
   registerUploadRoutes(app, { db, config });
   registerVersionRoutes(app, { db, config });
+  registerVersionRestoreRoutes(app, { db });
+  registerShareRoutes(app, { db, config });
+  registerAuditRoutes(app, { db });
 
   const logins = createTelegramLoginManager({
     createGateway: () => {

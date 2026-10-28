@@ -9,6 +9,7 @@ import {
 } from '@stackbase/contracts';
 import type { Db } from '../../database/db';
 import { authRequired } from '../../errors';
+import { recordAuditEvent } from '../audit/repository';
 import {
   createFolder,
   listFolders,
@@ -80,6 +81,12 @@ export function registerFolderRoutes(app: FastifyInstance, deps: { db: Db }): vo
       const user = request.user;
       if (!user) throw authRequired();
       const result = await trashFolder(deps.db, user.id, request.params.folderId);
+      await recordAuditEvent(deps.db, user.id, {
+        eventType: 'folder.trash',
+        resourceType: 'folder',
+        resourceId: request.params.folderId,
+        metadata: { folders: result.folders, files: result.files },
+      });
       return { ok: true as const, affected: result.folders + result.files };
     },
   );

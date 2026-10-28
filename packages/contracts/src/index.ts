@@ -7,3 +7,6 @@ export * from './encryption';
 export * from './storage';
 export * from './uploads';
 export * from './insights';
+export * from './shares';
+export * from './lifecycle';
+export * from './audit';

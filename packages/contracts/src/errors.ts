@@ -25,6 +25,12 @@ export const ERROR_CODES = [
   'VAULT_ALREADY_EXISTS',
   'TELEGRAM_NOT_CONFIGURED',
   'UPLOAD_NOT_FOUND',
+  // Added in Milestone 5 (ADR-019): share links distinguish every refusal so
+  // the recipient page can explain it without learning anything else.
+  'SHARE_NOT_FOUND',
+  'SHARE_KEY_UNAVAILABLE',
+  'SHARE_FILE_UNAVAILABLE',
+  'SHARE_DOWNLOAD_LIMIT_REACHED',
   'RATE_LIMITED',
   'ROUTE_NOT_FOUND',
   'INTERNAL_ERROR',

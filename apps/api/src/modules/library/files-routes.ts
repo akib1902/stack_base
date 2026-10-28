@@ -22,6 +22,7 @@ import {
   updateFile,
 } from './files-repository';
 import { searchLibrary } from './summary-repository';
+import { recordAuditEvent } from '../audit/repository';
 
 const FileParams = Type.Object({ fileId: Type.String({ minLength: 1 }) });
 type FileParamsType = Static<typeof FileParams>;
@@ -79,6 +80,13 @@ export function registerFileRoutes(app: FastifyInstance, deps: { db: Db }): void
       const user = request.user;
       if (!user) throw authRequired();
       const affected = await bulkUpdateFiles(deps.db, user.id, request.body);
+      if (request.body.action === 'trash' && affected > 0) {
+        await recordAuditEvent(deps.db, user.id, {
+          eventType: 'file.trash',
+          resourceType: 'file',
+          metadata: { files: affected, bulk: true },
+        });
+      }
       return { ok: true as const, affected };
     },
   );
@@ -133,6 +141,13 @@ export function registerFileRoutes(app: FastifyInstance, deps: { db: Db }): void
       const user = request.user;
       if (!user) throw authRequired();
       const affected = await trashFile(deps.db, user.id, request.params.fileId);
+      if (affected > 0) {
+        await recordAuditEvent(deps.db, user.id, {
+          eventType: 'file.trash',
+          resourceType: 'file',
+          resourceId: request.params.fileId,
+        });
+      }
       return { ok: true as const, affected };
     },
   );
