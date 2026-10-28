@@ -86,6 +86,21 @@ export async function apiFetchPublic<T>(path: string, init?: RequestInit): Promi
 }
 
 /**
+ * Unauthenticated streamed call used by the public share page. The share token
+ * is a capability, so no session cookie or bearer token is attached.
+ */
+export async function apiFetchPublicStream(path: string): Promise<Response> {
+  try {
+    return await fetch(`${API_BASE_URL}${path}`, {
+      cache: 'no-store',
+      headers: { accept: 'application/octet-stream' },
+    });
+  } catch (error) {
+    throw new ApiUnavailableError(error);
+  }
+}
+
+/**
  * Authenticated call that hands back the raw response instead of parsed JSON.
  * Used for streamed and binary bodies (ciphertext downloads, chunk uploads),
  * which must not be buffered into a JSON string on the way through.

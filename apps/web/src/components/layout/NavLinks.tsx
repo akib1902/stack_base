@@ -28,7 +28,7 @@ const PRIMARY_NAV: NavItem[] = [
   { href: '/files', label: 'All files', icon: FolderOpen, available: true },
   { href: '/recent', label: 'Recent', icon: Clock, available: true },
   { href: '/favorites', label: 'Favorites', icon: Star, available: true },
-  { href: '/shared', label: 'Shared', icon: Share2, available: false },
+  { href: '/shared', label: 'Shared', icon: Share2, available: true },
   { href: '/trash', label: 'Trash', icon: Trash2, available: true },
 ];
 

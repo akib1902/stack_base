@@ -16,6 +16,7 @@ import {
   type LibraryMode,
   type LibraryView,
 } from '@/features/library/params';
+import { ShareDialog } from '@/features/shares/share-dialog';
 import { ConfirmDialog } from './ConfirmDialog';
 import { FileDetailsDialog } from './FileDetailsDialog';
 import { FolderDialog } from './FolderDialog';
@@ -133,6 +134,7 @@ export function FileBrowser({
     () => files.find((file) => file.id === view.fileId) ?? null,
   );
   const [editingFolder, setEditingFolder] = useState<FolderSummary | null>(null);
+  const [sharingFile, setSharingFile] = useState<FileSummary | null>(null);
   const [moveOpen, setMoveOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [pending, setPending] = useState(false);
@@ -291,10 +293,21 @@ export function FileBrowser({
           setOpenFile(null);
           router.refresh();
         }}
+        onRestored={() => router.refresh()}
+        onShare={(file) => {
+          setOpenFile(null);
+          setSharingFile(file);
+        }}
         onRequestDelete={(file) => {
           setOpenFile(null);
           setConfirmation({ kind: 'file', ids: [file.id], name: file.name });
         }}
+      />
+
+      <ShareDialog
+        open={sharingFile !== null}
+        file={sharingFile}
+        onClose={() => setSharingFile(null)}
       />
 
       <FolderDialog

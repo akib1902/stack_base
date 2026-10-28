@@ -4,11 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { TrashItem } from '@stackbase/contracts';
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/feedback/EmptyState';
 import { formatBytes, formatDate, formatRelativeDate } from '@/lib/utils/format';
 import {
+  purgeExpiredTrashAction,
   purgeTrashAction,
   restoreTrashAction,
 } from '@/features/library/actions';
@@ -26,6 +27,8 @@ export function TrashView({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toPurge, setToPurge] = useState<TrashItem | null>(null);
   const [pending, setPending] = useState(false);
+  const [purgingExpired, setPurgingExpired] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const restore = async (item: TrashItem): Promise<void> => {
@@ -51,6 +54,28 @@ export function TrashView({
       return;
     }
     setToPurge(null);
+    router.refresh();
+  };
+
+  const purgeExpired = async (): Promise<void> => {
+    if (purgingExpired) return;
+    setPurgingExpired(true);
+    setError(null);
+    setNotice(null);
+    const result = await purgeExpiredTrashAction();
+    setPurgingExpired(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    const { purged, skipped } = result.data;
+    setNotice(
+      purged === 0
+        ? 'No expired items were found.'
+        : `${purged} expired ${purged === 1 ? 'item was' : 'items were'} permanently removed${
+            skipped > 0 ? `; ${skipped} could not be reached and will be retried` : ''
+          }.`,
+    );
     router.refresh();
   };
 
@@ -80,11 +105,31 @@ export function TrashView({
         </p>
       ) : null}
 
-      <p className="text-xs leading-relaxed text-muted">
-        {retentionDays === 0
-          ? 'Retention is set to 0 days, so nothing expires automatically. Items stay until you remove them.'
-          : `Items are slated to expire after ${retentionDays} days. Automatic purging arrives with the lifecycle milestone; until then nothing is deleted without you.`}
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="max-w-prose text-xs leading-relaxed text-muted">
+          {retentionDays === 0
+            ? 'Retention is set to 0 days, so nothing expires automatically. Items stay until you remove them.'
+            : `Items older than ${retentionDays} days are permanently removed from storage when Trash is opened. Restoring keeps an item.`}
+        </p>
+        {retentionDays > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={purgingExpired}
+            onClick={() => void purgeExpired()}
+          >
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            {purgingExpired ? 'Purging…' : 'Purge expired now'}
+          </Button>
+        ) : null}
+      </div>
+
+      {notice ? (
+        <p role="status" className="rounded-xl border border-success/25 bg-success/10 px-3 py-2 text-xs text-success">
+          {notice}
+        </p>
+      ) : null}
 
       <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
         {items.map((item) => {

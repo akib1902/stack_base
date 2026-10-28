@@ -9,6 +9,7 @@ import { CryptoError } from '@/lib/crypto/errors';
 import { decryptFile } from '@/lib/crypto/file-format';
 import { useVault } from '@/features/encryption/vault-context';
 import { useVaultGate } from '@/features/encryption/use-vault-gate';
+import { saveDecryptedBlob } from '@/lib/utils/save-file';
 
 /**
  * Downloads ciphertext through this app's route handler, decrypts it in the
@@ -49,37 +50,13 @@ export function DownloadFileButton({
         throw new Error('This file has no stored version yet.');
       }
 
-      const response = await sendRaw(
-        `/api/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(version.id)}/download`,
-      );
-      if (!response.body) {
-        throw new Error('The download stream is empty.');
-      }
-
-      const parts: Uint8Array[] = [];
-      let received = 0;
-      for await (const chunk of decryptFile({
-        manifest: version.manifest,
+      await downloadFileVersion({
+        fileId,
+        version,
+        fileName,
         vaultKey,
-        body: response.body,
-      })) {
-        parts.push(chunk);
-        received += chunk.length;
-        setPercent(
-          version.manifest.plaintextSize === 0
-            ? 100
-            : Math.min(99, Math.round((received / version.manifest.plaintextSize) * 100)),
-        );
-      }
-
-      const url = URL.createObjectURL(new Blob(parts as BlobPart[]));
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = fileName;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+        onProgress: (percent) => setPercent(percent),
+      });
       setPercent(null);
     } catch (failure) {
       setPercent(null);
@@ -118,6 +95,50 @@ export function DownloadFileButton({
       {gate.dialog}
     </div>
   );
+}
+
+/**
+ * Streams, verifies and decrypts one immutable version, then saves it. Shared by
+ * the latest-version button and the version history so both paths verify the
+ * same manifest and ciphertext hash.
+ */
+export async function downloadFileVersion({
+  fileId,
+  version,
+  fileName,
+  vaultKey,
+  onProgress,
+}: {
+  fileId: string;
+  version: FileVersion;
+  fileName: string;
+  vaultKey: Uint8Array;
+  onProgress?: (percent: number) => void;
+}): Promise<void> {
+  const response = await sendRaw(
+    `/api/files/${encodeURIComponent(fileId)}/versions/${encodeURIComponent(version.id)}/download`,
+  );
+  if (!response.body) {
+    throw new Error('The download stream is empty.');
+  }
+
+  const parts: Uint8Array[] = [];
+  let received = 0;
+  for await (const chunk of decryptFile({
+    manifest: version.manifest,
+    vaultKey,
+    body: response.body,
+  })) {
+    parts.push(chunk);
+    received += chunk.length;
+    onProgress?.(
+      version.manifest.plaintextSize === 0
+        ? 100
+        : Math.min(99, Math.round((received / version.manifest.plaintextSize) * 100)),
+    );
+  }
+
+  saveDecryptedBlob(parts, fileName);
 }
 
 /** Highest version number whose ciphertext is still stored. */

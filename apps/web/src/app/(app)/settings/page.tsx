@@ -1,7 +1,21 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import type { MeResponse, SetupStatusResponse, TagListResponse } from '@stackbase/contracts';
+import type {
+  MeResponse,
+  SetupStatusResponse,
+  ShareListResponse,
+  TagListResponse,
+} from '@stackbase/contracts';
 import type { ReactNode } from 'react';
-import { Palette, Send, ShieldCheck, SlidersHorizontal, Tag, UserRound } from 'lucide-react';
+import {
+  Palette,
+  Send,
+  Share2,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tag,
+  UserRound,
+} from 'lucide-react';
 import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Card, CardHeading } from '@/components/ui/Card';
 import { VaultCard } from '@/features/encryption/vault-card';
@@ -29,12 +43,14 @@ export default async function SettingsPage() {
   let me: MeResponse;
   let setup: SetupStatusResponse;
   let tags: TagListResponse;
+  let shares: ShareListResponse;
 
   try {
-    [me, setup, tags] = await Promise.all([
+    [me, setup, tags, shares] = await Promise.all([
       apiFetch<MeResponse>('/api/v1/me'),
       apiFetch<SetupStatusResponse>('/api/v1/setup/status'),
       apiFetch<TagListResponse>('/api/v1/tags'),
+      apiFetch<ShareListResponse>('/api/v1/shares'),
     ]);
   } catch (error) {
     if (error instanceof UnauthenticatedError) {
@@ -45,6 +61,7 @@ export default async function SettingsPage() {
 
   const theme = await readTheme();
   const storage = describeStorage(setup.storage);
+  const activeShares = shares.items.filter((share) => share.status === 'active').length;
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -85,8 +102,8 @@ export default async function SettingsPage() {
           </DetailRow>
         </dl>
         <p className="mt-2 text-[11px] leading-relaxed text-muted">
-          Trash currently keeps items until you restore or permanently delete them. Automatic
-          purging arrives with the lifecycle milestone.
+          Retention is enforced when you open Trash: expired items are permanently removed from
+          the provider then, while a setting of 0 keeps everything until you delete it.
         </p>
       </Card>
 
@@ -152,13 +169,29 @@ export default async function SettingsPage() {
 
       <Card>
         <CardHeading
-          icon={<ShieldCheck className="size-4" />}
+          icon={<Share2 className="size-4" />}
           title="Sharing"
-          hint="Revocable links arrive with the sharing milestone"
+          hint="Read-only, revocable links to one immutable version"
+          action={
+            <Link href="/shared" className="text-xs font-medium text-primary hover:underline">
+              Manage links
+            </Link>
+          }
         />
-        <p className="text-sm leading-relaxed text-muted">
-          No shares exist yet. Share links will reference a single immutable file version, be
-          revocable server-side and never expose your storage credentials.
+        <dl>
+          <DetailRow label="Active links">{activeShares}</DetailRow>
+          <DetailRow label="Total links">{shares.items.length}</DetailRow>
+          <DetailRow label="Key transfer">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="size-3.5 text-success" aria-hidden="true" />
+              URL fragment, never sent to the server
+            </span>
+          </DetailRow>
+        </dl>
+        <p className="mt-3 text-[11px] leading-relaxed text-muted">
+          Each link carries its own wrapped data key, so a shared link cannot unlock the vault or
+          any other file. Revoking stops future downloads through StackBase; copies a recipient
+          already saved cannot be recalled.
         </p>
       </Card>
     </div>

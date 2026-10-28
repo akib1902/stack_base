@@ -9,7 +9,8 @@ export type CryptoErrorCode =
   | 'UNSUPPORTED_MANIFEST'
   | 'INVALID_MANIFEST'
   | 'DECRYPTION_FAILED'
-  | 'ENCRYPTION_FAILED';
+  | 'ENCRYPTION_FAILED'
+  | 'INVALID_SHARE_KEY';
 
 export class CryptoError extends Error {
   readonly code: CryptoErrorCode;
@@ -32,4 +33,6 @@ export const CRYPTO_ERROR_COPY: Record<CryptoErrorCode, string> = {
   DECRYPTION_FAILED:
     'The encrypted stream failed its integrity check, so nothing was decrypted.',
   ENCRYPTION_FAILED: 'The file could not be encrypted on this device.',
+  INVALID_SHARE_KEY:
+    'This share link is incomplete or damaged: the part after # is missing or invalid.',
 };

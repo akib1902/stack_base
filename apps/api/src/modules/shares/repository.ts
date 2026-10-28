@@ -64,7 +64,7 @@ interface OwnerShareRow {
 
 const OWNER_SHARE_SELECT = `
   select s.id,
-         s.file_id as "fileId",
+         v.file_id as "fileId",
          f.name as "fileName",
          s.file_version_id as "versionId",
          v.version_number as "versionNumber",
@@ -147,7 +147,7 @@ export async function listShares(
 ): Promise<Share[]> {
   const { rows } = await db.query<OwnerShareRow>(
     `${OWNER_SHARE_SELECT}
-      where s.user_id = $1 ${fileId ? 'and s.file_id = $2' : ''}
+      where s.user_id = $1 ${fileId ? 'and v.file_id = $2' : ''}
       order by s.created_at desc`,
     fileId ? [userId, fileId] : [userId],
   );
@@ -433,6 +433,31 @@ export async function loadPublicShare(
     reference: row.providerReference as ProviderReference,
     view: mapPublicShare(row),
   };
+}
+
+/**
+ * Audit a refused public download. The owner is resolved from the token hash so
+ * the trail stays owner-scoped; unknown tokens create no event (there is no
+ * owner to attach it to). Never accepts or records the raw token.
+ */
+export async function recordShareDownloadDenied(
+  db: Db,
+  token: string,
+  code: string,
+): Promise<void> {
+  const { rows } = await db.query<{ userId: string; shareId: string }>(
+    'select user_id as "userId", id as "shareId" from public.shares where token_hash = $1',
+    [hashToken(token)],
+  );
+  const row = rows[0];
+  if (!row) return;
+  await recordAuditEvent(db, row.userId, {
+    eventType: 'share.download',
+    resourceType: 'share',
+    resourceId: row.shareId,
+    result: 'denied',
+    metadata: { reason: code },
+  });
 }
 
 /**

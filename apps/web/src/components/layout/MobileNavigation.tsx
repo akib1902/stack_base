@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Clock, FolderOpen, Home, Settings, Trash2 } from 'lucide-react';
+import { Clock, FolderOpen, Home, Settings, Share2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const ITEMS = [
   { href: '/', label: 'Home', Icon: Home },
   { href: '/files', label: 'Files', Icon: FolderOpen },
   { href: '/recent', label: 'Recent', Icon: Clock },
+  { href: '/shared', label: 'Shared', Icon: Share2 },
   { href: '/trash', label: 'Trash', Icon: Trash2 },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];

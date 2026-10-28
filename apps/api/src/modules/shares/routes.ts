@@ -11,7 +11,7 @@ import {
 } from '@stackbase/contracts';
 import type { Config } from '../../config/env';
 import type { Db } from '../../database/db';
-import { authRequired } from '../../errors';
+import { ApiError, authRequired } from '../../errors';
 import { mapProviderErrorToApiError, openStorageProvider } from '../../storage/registry';
 import {
   SHARE_TOKEN_PATTERN,
@@ -19,6 +19,7 @@ import {
   createShare,
   listShares,
   loadPublicShare,
+  recordShareDownloadDenied,
   revokeShare,
 } from './repository';
 
@@ -117,7 +118,17 @@ export function registerShareRoutes(
       schema: { params: PublicTokenParams },
     },
     async (request, reply) => {
-      const target = await loadPublicShare(deps.db, request.params.token);
+      let target;
+      try {
+        target = await loadPublicShare(deps.db, request.params.token);
+      } catch (error) {
+        // A refused attempt is audited for the owner, even though no owner
+        // session is involved in the request.
+        if (error instanceof ApiError) {
+          await recordShareDownloadDenied(deps.db, request.params.token, error.code);
+        }
+        throw error;
+      }
 
       let handle;
       try {

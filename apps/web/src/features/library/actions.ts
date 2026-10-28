@@ -128,6 +128,12 @@ export async function purgeTrashAction(
   });
 }
 
+export async function purgeExpiredTrashAction(): Promise<
+  ActionResult<{ purged: number; skipped: number }>
+> {
+  return mutate(() => send<{ purged: number; skipped: number }>('/api/v1/trash/purge', 'POST'));
+}
+
 export async function createTagAction(
   input: CreateTagRequest,
 ): Promise<ActionResult<TagListItem>> {

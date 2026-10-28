@@ -108,7 +108,7 @@ describe('trash retention (FR-09)', () => {
 
   it('purges a trashed folder with its versions, shares and ciphertext', async () => {
     const folderResponse = await call('POST', '/api/v1/folders', { name: 'Cabinet' });
-    expect(folderResponse.statusCode).toBe(200);
+    expect(folderResponse.statusCode).toBe(201);
     const folder = folderResponse.json() as FolderSummary;
 
     const fileId = await insertTestFile(ctx.db, alice.id, {

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import type { FileSummary, FolderSummary, TagListItem } from '@stackbase/contracts';
-import { Info, Plus } from 'lucide-react';
+import { Info, Plus, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Dialog, FormError } from '@/components/ui/Dialog';
 import {
@@ -14,6 +14,7 @@ import { CATEGORY_META } from '@/features/library/category-meta';
 import { folderOptionLabel } from '@/features/library/params';
 import { FilePreview } from '@/features/previews/file-preview';
 import { DownloadFileButton } from '@/features/uploads/download-button';
+import { VersionHistory } from '@/features/uploads/version-history';
 import { formatBytes, formatDateTime } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
@@ -33,6 +34,8 @@ export function FileDetailsDialog({
   tags,
   onClose,
   onSaved,
+  onRestored,
+  onShare,
   onRequestDelete,
 }: {
   open: boolean;
@@ -41,6 +44,8 @@ export function FileDetailsDialog({
   tags: readonly TagListItem[];
   onClose: () => void;
   onSaved: () => void;
+  onRestored: () => void;
+  onShare: (file: FileSummary) => void;
   onRequestDelete: (file: FileSummary) => void;
 }) {
   const [name, setName] = useState('');
@@ -149,11 +154,22 @@ export function FileDetailsDialog({
               Move to trash
             </Button>
             {file.contentStatus === 'ready' ? (
-              <DownloadFileButton
-                fileId={file.id}
-                fileName={file.name}
-                sizeBytes={file.sizeBytes}
-              />
+              <>
+                <DownloadFileButton
+                  fileId={file.id}
+                  fileName={file.name}
+                  sizeBytes={file.sizeBytes}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onShare(file)}
+                >
+                  <Share2 className="size-3.5" aria-hidden="true" />
+                  Share link
+                </Button>
+              </>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
@@ -172,6 +188,10 @@ export function FileDetailsDialog({
 
         {/* Decrypts in this tab on open; nothing is requested while closed. */}
         {open ? <FilePreview file={file} /> : null}
+
+        {open && file.contentStatus === 'ready' ? (
+          <VersionHistory fileId={file.id} fileName={file.name} onRestored={onRestored} />
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">

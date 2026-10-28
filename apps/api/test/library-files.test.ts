@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FileListResponse, FileSummary, MutationResponse, TrashListResponse } from '@stackbase/contracts';
@@ -5,6 +7,7 @@ import {
   authHeader,
   createTestContext,
   insertTestFile,
+  insertTestVersion,
   signIn,
   type DevSession,
   type TestContext,
@@ -396,40 +399,26 @@ describe('trash lifecycle for files', () => {
     );
   });
 
-  it('refuses to purge metadata while encrypted versions still reference content', async () => {
+  it('permanently deletes a trashed file with stored versions and ciphertext', async () => {
     const versionedId = await insertTestFile(ctx.db, alice.id, {
       name: 'versioned.bin',
       mimeType: 'application/octet-stream',
-      sizeBytes: 10,
     });
+    const version = await insertTestVersion(ctx.db, ctx.objectsDir, alice.id, versionedId);
 
-    const connection = await ctx.db.query<{ id: string }>(
-      `insert into public.storage_connections (user_id, connection_status)
-       values ($1, 'connected') returning id`,
-      [alice.id],
+    const objectPath = path.join(
+      ctx.objectsDir,
+      alice.id,
+      `${version.storageObjectId}.bin`,
     );
-    const object = await ctx.db.query<{ id: string }>(
-      `insert into public.storage_objects
-         (user_id, storage_connection_id, telegram_chat_reference, telegram_message_reference, storage_status)
-       values ($1, $2, 'saved', 'msg-library-1', 'available') returning id`,
-      [alice.id, connection.rows[0]?.id],
-    );
-    await ctx.db.query(
-      `insert into public.file_versions
-         (user_id, file_id, version_number, size_bytes, ciphertext_hash,
-          encryption_format_version, encryption_manifest, storage_object_id, created_by)
-       values ($1, $2, 1, 10, 'hash', 'stackbase-stream-v1',
-         '{"formatVersion":"stackbase-stream-v1"}'::jsonb, $3, $1)`,
-      [alice.id, versionedId, object.rows[0]?.id],
-    );
+    expect(existsSync(objectPath)).toBe(true);
 
     await call(alice, 'DELETE', `/api/v1/files/${versionedId}`);
     const purge = await call(alice, 'DELETE', `/api/v1/trash/files/${versionedId}`);
-
-    expect(purge.statusCode).toBe(409);
-    expect(purge.json()).toMatchObject({ error: { code: 'STORAGE_RECONCILIATION_REQUIRED' } });
+    expect(purge.statusCode).toBe(200);
+    expect(existsSync(objectPath)).toBe(false);
 
     const stillThere = await ctx.db.query('select 1 from public.files where id = $1', [versionedId]);
-    expect(stillThere.rows).toHaveLength(1);
+    expect(stillThere.rows).toHaveLength(0);
   });
 });

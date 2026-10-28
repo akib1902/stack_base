@@ -190,7 +190,10 @@ describe('share links (FR-12)', () => {
     const expired = await createShare(alice, expiredFixture.fileId, expiredFixture.version.versionId);
     const expiredBody = expired.json() as CreateShareResponse;
     await ctx.db.query(
-      `update public.shares set expires_at = now() - interval '1 minute' where id = $1`,
+      `update public.shares
+          set created_at = now() - interval '2 days',
+              expires_at = now() - interval '1 minute'
+        where id = $1`,
       [expiredBody.share.id],
     );
     const expiredResponse = await publicGet(expiredBody.token);
@@ -209,7 +212,7 @@ describe('share links (FR-12)', () => {
 
   it('refuses other owners’ versions, trashed files and hides deleted files', async () => {
     const bobFixture = await createFixture('foreign.bin', bob);
-    const foreign = await createShare(bobFixture, alice);
+    const foreign = await createShare(alice, bobFixture.fileId, bobFixture.version.versionId);
     expect(foreign.statusCode).toBe(404);
 
     const { fileId, version } = await createFixture('deleted.bin');
