@@ -119,6 +119,7 @@ docs/                  setup, architecture, decisions and milestone reports
 - [Local development and Supabase deployment](docs/setup/local-development.md)
 - [Encryption format `stackbase/1`](docs/architecture/encryption-format.md)
 - [Architecture decisions and documented deviations](docs/architecture/decisions.md)
+- [Milestone 4 report](docs/reports/milestone-4.md)
 - [Milestone 3 report](docs/reports/milestone-3.md)
 - [Milestone 1 report](docs/reports/milestone-1.md)
 

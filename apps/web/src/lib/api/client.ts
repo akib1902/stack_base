@@ -44,7 +44,9 @@ async function request<T>(
       ...init,
       cache: 'no-store',
       headers: {
-        'content-type': 'application/json',
+        // Bodyless actions (cancel, pause, resume, retry) must not declare a
+        // JSON body: Fastify rejects an empty one with 400.
+        ...(init?.body === undefined ? {} : { 'content-type': 'application/json' }),
         ...(init?.headers ?? {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },

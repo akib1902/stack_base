@@ -190,6 +190,8 @@ upload pipeline).
 |---|---|
 | `Invalid configuration: DEV_AUTH_SECRET is required` | Paste the generated secret into `apps/api/.env` |
 | Web shows "Something went wrong" | The API is not running: start `pnpm dev:api` |
+| Page renders but buttons and inputs do nothing, console shows blocked `/_next/hmr` or font requests | Opened as `127.0.0.1`: Next 16 blocks its development client assets from other origins, so React never hydrates. Use <http://localhost:3000> |
+| API exits with `RuntimeError: Aborted()` from PGlite | The local WASM database was left unrecoverable by an abrupt process kill. Stop the API, move `apps/api/.data/pglite` aside, and restart — a fresh database is created and migrated. Prefix with `STACKBASE_LOCAL_DATA_DIR` to verify against a separate directory without touching it |
 | `Migration failed: schema "auth" does not exist` | You pointed `DATABASE_URL` at a bare PostgreSQL. Use Supabase, or set `STACKBASE_LOCAL_AUTH_STUB=1` knowingly |
 | Sign-in returns 404 | The API runs with `AUTH_MODE=supabase` or `NODE_ENV=production`; dev sessions are disabled by design |
 | Upload fails with `TELEGRAM_NOT_CONFIGURED` (503) | `STORAGE_PROVIDER=telegram` without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH`/`SESSION_ENCRYPTION_KEY` |
