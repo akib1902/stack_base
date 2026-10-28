@@ -8,6 +8,7 @@ import type {
 } from '@stackbase/contracts';
 import type { ReactNode } from 'react';
 import {
+  CloudOff,
   Palette,
   Send,
   Share2,
@@ -20,6 +21,7 @@ import { Badge, StatusDot } from '@/components/ui/Badge';
 import { Card, CardHeading } from '@/components/ui/Card';
 import { VaultCard } from '@/features/encryption/vault-card';
 import { LibraryPreferences } from '@/features/settings/library-preferences';
+import { OfflinePreferences } from '@/features/settings/offline-preferences';
 import { TelegramConnectionForm } from '@/features/settings/telegram-connection';
 import { TagManager } from '@/features/settings/tag-manager';
 import { ThemePicker } from '@/features/settings/theme-picker';
@@ -105,6 +107,15 @@ export default async function SettingsPage() {
           Retention is enforced when you open Trash: expired items are permanently removed from
           the provider then, while a setting of 0 keeps everything until you delete it.
         </p>
+      </Card>
+
+      <Card>
+        <CardHeading
+          icon={<CloudOff className="size-4" />}
+          title="Offline and cache"
+          hint="Metadata this device keeps, and the changes waiting to sync"
+        />
+        <OfflinePreferences settings={me.settings} />
       </Card>
 
       <Card>

@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#d97706" />
+    <meta name="robots" content="noindex" />
+    <title>Offline · StackBase</title>
+    <!--
+      The public offline shell (SRS C8). It contains no server-rendered markup
+      and no plaintext beyond what this browser already decrypted and stored in
+      IndexedDB for the signed-in account; it is never cached with private API
+      responses because it is a static file.
+    -->
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #faf8f4;
+        --surface: #ffffff;
+        --border: #e7e1d6;
+        --ink: #1f1a12;
+        --muted: #6f675a;
+        --primary: #d97706;
+        --ok: #15803d;
+        --warn: #b45309;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #17191c;
+          --surface: #202328;
+          --border: #2f343b;
+          --ink: #f4f1ea;
+          --muted: #a09a8e;
+          --primary: #f2a93b;
+          --ok: #4ade80;
+          --warn: #f2a93b;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 3rem;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 0.6rem;
+        background: var(--primary);
+        color: #1f1a12;
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 1.75rem 0 0.4rem;
+        font-size: 1.5rem;
+        letter-spacing: -0.02em;
+      }
+      p {
+        margin: 0.4rem 0;
+        color: var(--muted);
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin-top: 1.25rem;
+        padding: 0.3rem 0.7rem;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: var(--warn);
+      }
+      .status[data-online='true'] .dot {
+        background: var(--ok);
+      }
+      .card {
+        margin-top: 1.5rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.9rem;
+        background: var(--surface);
+      }
+      h2 {
+        margin: 0 0 0.75rem;
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      li {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.5rem 0;
+        border-top: 1px solid var(--border);
+        font-size: 0.9rem;
+      }
+      li:first-child {
+        border-top: 0;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .pill {
+        padding: 0.05rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        font-size: 0.72rem;
+        font-weight: 650;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .pill[data-status='conflict'] {
+        color: #b91c1c;
+        border-color: #b91c1c;
+      }
+      .pill[data-status='failed'] {
+        color: #b91c1c;
+        border-color: #b91c1c;
+      }
+      .pill[data-status='pending'] {
+        color: var(--warn);
+        border-color: var(--warn);
+      }
+      button {
+        margin-top: 1.25rem;
+        padding: 0.6rem 1.1rem;
+        border: 0;
+        border-radius: 0.7rem;
+        background: var(--primary);
+        color: #1f1a12;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      a {
+        color: var(--primary);
+      }
+      .foot {
+        margin-top: 2rem;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="brand"><span class="mark">SB</span> StackBase</div>
+
+      <h1>You are offline</h1>
+      <p>
+        This page could not be reached, so StackBase is showing what it already
+        has on this device. Nothing here is fetched while you are offline.
+      </p>
+
+      <span class="status" id="status" data-online="false">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="status-text">Checking connection…</span>
+      </span>
+
+      <section class="card" aria-labelledby="account-heading">
+        <h2 id="account-heading">Signed in on this device</h2>
+        <p id="account" class="empty">No cached account.</p>
+      </section>
+
+      <section class="card" aria-labelledby="cache-heading">
+        <h2 id="cache-heading">Cached library metadata</h2>
+        <p id="cache-stored" class="empty">Nothing cached yet.</p>
+        <ul id="files"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="queue-heading">
+        <h2 id="queue-heading">Queued operations</h2>
+        <p id="queue-empty" class="empty">No waiting changes.</p>
+        <ul id="queue"></ul>
+      </section>
+
+      <button type="button" id="retry">Try again</button>
+
+      <p class="foot">
+        Reconnect and this page reloads automatically. Your queued changes are
+        kept on this device until they can be applied — the queue will tell you
+        if a change conflicts with one made elsewhere.
+        <a href="/">Back to StackBase</a>
+      </p>
+    </main>
+
+    <script>
+      const DB_NAME = 'stackbase-offline';
+      const DB_VERSION = 1;
+
+      const status = document.getElementById('status');
+      const statusText = document.getElementById('status-text');
+      const accountEl = document.getElementById('account');
+      const cacheStoredEl = document.getElementById('cache-stored');
+      const filesEl = document.getElementById('files');
+      const queueEmptyEl = document.getElementById('queue-empty');
+      const queueEl = document.getElementById('queue');
+
+      function renderConnection() {
+        const online = navigator.onLine;
+        status.dataset.online = String(online);
+        statusText.textContent = online
+          ? 'Back online — retry to open StackBase'
+          : 'Offline — showing cached data';
+      }
+
+      function formatBytes(value) {
+        if (typeof value !== 'number' || Number.isNaN(value)) return '';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = value;
+        let unit = 0;
+        while (size >= 1024 && unit < units.length - 1) {
+          size /= 1024;
+          unit += 1;
+        }
+        return `${size >= 10 || unit === 0 ? Math.round(size) : size.toFixed(1)} ${units[unit]}`;
+      }
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          if (!('indexedDB' in window)) {
+            reject(new Error('IndexedDB unavailable'));
+            return;
+          }
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains('owner')) {
+              db.createObjectStore('owner', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('library')) {
+              db.createObjectStore('library', { keyPath: 'userId' });
+            }
+            if (!db.objectStoreNames.contains('queue')) {
+              db.createObjectStore('queue', { keyPath: 'id' });
+            }
+          };
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      function readAll(db, store) {
+        return new Promise((resolve, reject) => {
+          const request = db.transaction(store, 'readonly').objectStore(store).getAll();
+          request.onsuccess = () => resolve(request.result ?? []);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      async function render() {
+        renderConnection();
+        let db;
+        try {
+          db = await openDb();
+        } catch {
+          accountEl.textContent =
+            'This browser cannot store offline metadata (IndexedDB unavailable).';
+          return;
+        }
+
+        const owner = (await readAll(db, 'owner'))[0];
+        if (owner?.email) {
+          accountEl.textContent = owner.email;
+          accountEl.classList.remove('empty');
+        }
+
+        const libraries = await readAll(db, 'library');
+        const library = owner
+          ? libraries.find((record) => record.userId === owner.userId)
+          : undefined;
+
+        if (library?.files?.length) {
+          cacheStoredEl.textContent = `Last synced ${new Date(
+            library.storedAt,
+          ).toLocaleString()} · ${library.files.length} file(s), ${
+            library.folders?.length ?? 0
+          } folder(s), ${library.tags?.length ?? 0} tag(s)`;
+          cacheStoredEl.classList.remove('empty');
+          filesEl.innerHTML = library.files
+            .slice(0, 25)
+            .map(
+              (file) =>
+                `<li><span>${escapeHtml(file.name ?? 'Untitled')}</span>` +
+                `<span class="meta">${formatBytes(file.sizeBytes)}</span></li>`,
+            )
+            .join('');
+        }
+
+        const queued = owner
+          ? (await readAll(db, 'queue')).filter(
+              (operation) => operation.userId === owner.userId,
+            )
+          : [];
+        queueEmptyEl.style.display = queued.length ? 'none' : 'block';
+        queueEl.innerHTML = queued
+          .map(
+            (operation) =>
+              `<li><span>${escapeHtml(operation.label ?? operation.kind)}</span>` +
+              `<span class="pill" data-status="${operation.status}">${operation.status}</span></li>`,
+          )
+          .join('');
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (character) =>
+            ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;',
+            })[character],
+        );
+      }
+
+      document.getElementById('retry').addEventListener('click', () => {
+        location.reload();
+      });
+      window.addEventListener('online', () => {
+        renderConnection();
+        setTimeout(() => location.reload(), 400);
+      });
+      window.addEventListener('offline', renderConnection);
+
+      void render();
+    </script>
+  </body>
+</html>

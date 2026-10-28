@@ -17,6 +17,7 @@ import {
   type LibraryView,
 } from '@/features/library/params';
 import { ShareDialog } from '@/features/shares/share-dialog';
+import { useMetadataMirror } from '@/features/offline/use-metadata-mirror';
 import { ConfirmDialog } from './ConfirmDialog';
 import { FileDetailsDialog } from './FileDetailsDialog';
 import { FolderDialog } from './FolderDialog';
@@ -129,8 +130,7 @@ export function FileBrowser({
   emptyState: ReactNode;
 }) {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [openFile, setOpenFile] = useState<FileSummary | null>(
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());  const [openFile, setOpenFile] = useState<FileSummary | null>(
     () => files.find((file) => file.id === view.fileId) ?? null,
   );
   const [editingFolder, setEditingFolder] = useState<FolderSummary | null>(null);
@@ -139,6 +139,9 @@ export function FileBrowser({
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mirrors what this screen was served into IndexedDB for offline viewing.
+  useMetadataMirror({ files, folders, tags });
 
   useEffect(() => {
     setSelectedIds((current) => {

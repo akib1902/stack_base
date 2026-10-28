@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import type { FileSummary, FolderSummary, TagListItem } from '@stackbase/contracts';
+import type {
+  FileSummary,
+  FolderSummary,
+  TagListItem,
+  UpdateFileRequest,
+} from '@stackbase/contracts';
 import { Info, Plus, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Dialog, FormError } from '@/components/ui/Dialog';
@@ -11,6 +16,8 @@ import {
   updateFileAction,
 } from '@/features/library/actions';
 import { CATEGORY_META } from '@/features/library/category-meta';
+import { useOffline } from '@/features/offline/offline-context';
+import { enqueueOperation } from '@/features/offline/queue';
 import { folderOptionLabel } from '@/features/library/params';
 import { FilePreview } from '@/features/previews/file-preview';
 import { DownloadFileButton } from '@/features/uploads/download-button';
@@ -57,6 +64,8 @@ export function FileDetailsDialog({
   const [newTag, setNewTag] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [queuedNotice, setQueuedNotice] = useState(false);
+  const { userId, offlineEnabled } = useOffline();
 
   useEffect(() => {
     if (!open || !file) return;
@@ -111,13 +120,36 @@ export function FileDetailsDialog({
 
     setPending(true);
     setError(null);
+    setQueuedNotice(false);
 
-    const updated = await updateFileAction(file.id, {
+    const patch: UpdateFileRequest = {
       name: trimmed,
       description: description.trim() ? description.trim() : null,
       folderId: folderId || null,
       favorite,
-    });
+    };
+
+    // Offline this tab cannot reach the app at all, so the whole save (fields
+    // plus tags) is written to the local queue against the file's current
+    // version and replayed when connectivity returns. Replay refuses to apply
+    // it if the file moved on meanwhile, rather than overwriting that edit.
+    const offline =
+      offlineEnabled && typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (offline) {
+      await enqueueOperation({
+        userId,
+        kind: 'update-file',
+        label: `Update “${trimmed}”`,
+        resourceId: file.id,
+        baseVersion: file.updatedAt,
+        payload: { patch, tagIds: [...selectedTags] },
+      });
+      setPending(false);
+      setQueuedNotice(true);
+      return;
+    }
+
+    const updated = await updateFileAction(file.id, patch);
     if (!updated.ok) {
       setPending(false);
       setError(updated.message);
@@ -185,6 +217,16 @@ export function FileDetailsDialog({
     >
       <div className="space-y-5">
         <FormError message={error} />
+
+        {queuedNotice ? (
+          <p
+            role="status"
+            className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-primary"
+          >
+            Saved to this device. It will be sent when you are back online, and Settings →
+            Offline and cache shows its status if it conflicts with another change.
+          </p>
+        ) : null}
 
         {/* Decrypts in this tab on open; nothing is requested while closed. */}
         {open ? <FilePreview file={file} /> : null}

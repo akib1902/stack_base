@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { MeResponse, VaultResponse } from '@stackbase/contracts';
 import { AppShell } from '@/components/layout/AppShell';
 import { VaultProvider } from '@/features/encryption/vault-context';
+import { OfflineProvider } from '@/features/offline/offline-context';
 import { UploadPanel } from '@/features/uploads/upload-panel';
 import { UploadProvider } from '@/features/uploads/upload-context';
 import { UnauthenticatedError, apiFetch } from '@/lib/api/client';
@@ -27,10 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // The vault record is public metadata (salt, parameters, wrapped key); the
     // key itself is derived and kept in the browser by these providers only.
     <VaultProvider record={vault.vault}>
-      <UploadProvider>
-        <AppShell user={me.user}>{children}</AppShell>
-        <UploadPanel />
-      </UploadProvider>
+      <OfflineProvider user={me.user} offlineEnabled={me.settings.offlineEnabled}>
+        <UploadProvider>
+          <AppShell user={me.user}>{children}</AppShell>
+          <UploadPanel />
+        </UploadProvider>
+      </OfflineProvider>
     </VaultProvider>
   );
 }

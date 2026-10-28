@@ -1,0 +1,44 @@
+{
+  "id": "/",
+  "name": "StackBase — personal cloud drive",
+  "short_name": "StackBase",
+  "description": "Organize, encrypt and preview your files, with ciphertext stored in your own Telegram account.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf8f4",
+  "theme_color": "#d97706",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "All files",
+      "short_name": "Files",
+      "url": "/files"
+    },
+    {
+      "name": "Trash",
+      "short_name": "Trash",
+      "url": "/trash"
+    }
+  ]
+}

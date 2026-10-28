@@ -44,7 +44,7 @@ async function mutate<T>(fn: () => Promise<T>): Promise<ActionResult<T>> {
   }
 }
 
-type Method = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 const send = <T>(path: string, method: Method, body?: unknown): Promise<T> =>
   apiFetch<T>(path, {
@@ -57,6 +57,30 @@ export async function updateFileAction(
   input: UpdateFileRequest,
 ): Promise<ActionResult<FileSummary>> {
   return mutate(() => send<FileSummary>(`/api/v1/files/${fileId}`, 'PATCH', input));
+}
+
+/**
+ * Current version marker of one file. The offline queue reads this before
+ * replaying a change made while offline: if the file moved on, the queued
+ * change is surfaced as a conflict instead of overwriting someone else's edit.
+ * `null` means the file is genuinely gone (404); any other failure throws so
+ * the queue keeps the operation instead of dropping it.
+ */
+export async function getFileVersionAction(
+  fileId: string,
+): Promise<ActionResult<{ updatedAt: string } | null>> {
+  try {
+    const file = await send<FileSummary>(`/api/v1/files/${fileId}`, 'GET');
+    return ok({ updatedAt: file.updatedAt });
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === 404) {
+      return ok(null);
+    }
+    if (error instanceof UnauthenticatedError) {
+      redirect('/sign-in');
+    }
+    return fail(describeError(error));
+  }
 }
 
 export async function setFileTagsAction(

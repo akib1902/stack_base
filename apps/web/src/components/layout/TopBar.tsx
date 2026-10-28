@@ -1,8 +1,9 @@
 import type { AuthUser } from '@stackbase/contracts';
-import { HardDrive, LogOut } from 'lucide-react';
-import { signOutAction } from '@/features/auth/actions';
+import { HardDrive } from 'lucide-react';
+import { OfflineIndicator } from '@/features/offline/offline-indicator';
 import { readTheme } from '@/lib/theme';
 import { CommandPalette } from './CommandPalette';
+import { SignOutButton } from './SignOutButton';
 import { ThemeToggle } from './ThemeToggle';
 
 export async function TopBar({ user }: { user: AuthUser }) {
@@ -25,19 +26,11 @@ export async function TopBar({ user }: { user: AuthUser }) {
         <div className="flex items-center gap-2">
           <CommandPalette />
           <ThemeToggle current={theme} />
+          <OfflineIndicator />
           <span className="hidden max-w-[220px] truncate rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted sm:inline">
             {user.email ?? user.id.slice(0, 8)}
           </span>
-          <form action={signOutAction}>
-            <button
-              type="submit"
-              title="Sign out"
-              className="grid size-9 place-items-center rounded-full border border-border bg-surface text-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              <LogOut className="size-4" aria-hidden="true" />
-              <span className="sr-only">Sign out</span>
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       </div>
     </header>
