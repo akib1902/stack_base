@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type {
   CreateShareResponse,
@@ -34,8 +35,8 @@ afterAll(async () => {
 const call = (
   method: 'GET' | 'POST' | 'DELETE',
   url: string,
-  payload?: unknown,
-) =>
+  payload?: object,
+): Promise<LightMyRequestResponse> =>
   ctx.app.inject({
     method,
     url,
