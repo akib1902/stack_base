@@ -57,7 +57,14 @@ function readPublicAsset(name: string): string {
 }
 
 const source = readPublicAsset('sw.js');
-const OFFLINE_URL = 'https://stackbase.example/offline.html';
+const SW_ORIGIN = 'https://stackbase.example';
+const OFFLINE_URL = `${SW_ORIGIN}/offline.html`;
+
+/** The real Cache API resolves relative URLs against the worker's scope. */
+function resolve(target: string | FakeRequest): string {
+  const value = typeof target === 'string' ? target : target.url;
+  return new URL(value, SW_ORIGIN).href;
+}
 
 function createHarness(): Harness {
   const listeners: Record<string, Listener[]> = {};
@@ -69,8 +76,7 @@ function createHarness(): Harness {
     return buckets.get(name)!;
   };
 
-  const urlOf = (target: string | FakeRequest): string =>
-    typeof target === 'string' ? target : target.url;
+  const urlOf = (target: string | FakeRequest): string => resolve(target);
 
   const cacheStorage = {
     async open(name: string) {
