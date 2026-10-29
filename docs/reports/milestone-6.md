@@ -6,11 +6,14 @@ metadata, the web app manifest and service worker, and queued offline operations
 conflict handling. Local-first variant retained: the service worker and IndexedDB were
 exercised in a real browser against the local provider, with no external credentials.
 
-**Status:** in progress. The offline slice and the responsive/accessibility pass are
-implemented, tested and verified. The remaining bullets — the security/integration/
-end-to-end sweep and clean-deployment validation — are not part of this pass, so the
-milestone exit criterion (*an independent developer can deploy and operate StackBase
-with their own accounts*) is **not** claimed.
+**Status:** in progress. All six Milestone 6 bullets are implemented and verified,
+including clean-deployment validation from a fresh clone — but that validation found
+one open blocker for the exit criterion: the web sign-in screen only issues local
+development sessions, so a Supabase-backed deployment cannot sign a user in yet. Live
+Supabase and Telegram projects were not available, so the production auth path was
+exercised against a local RS256/JWKS harness instead. The exit criterion (*an
+independent developer can deploy and operate StackBase with their own accounts*) is
+therefore **not** claimed.
 
 ---
 
@@ -135,7 +138,113 @@ with their own accounts*) is **not** claimed.
 - Icon buttons have accessible names, inputs are labeled, headings follow h1 → h2 → h3
   where present, status messages use `role="status"`/`role="alert"`, the global
   `prefers-reduced-motion` rule disables animation and smooth scrolling, and every
-  focusable control shows the 2 px offset focus ring.
+  focusable control shows the global `:focus-visible` ring — 2 px of `--ring` with a
+  2 px offset (#92400e on light, 6.6:1 against the cream canvas; #f2a93b on graphite).
+
+**Security, integration and end-to-end sweep (C12)**
+
+- **The route table is the test fixture.** `test/security-sweep.test.ts` parses
+  `app.printRoutes()` and sends a schema-valid request to **every** registered
+  `/api/v1` route with no session: 50 method/path pairs, of which 47 must answer
+  `401 AUTH_REQUIRED` and exactly three are public (dev sign-in, and the public share
+  view and download, where the 43-character token is the capability). Validation runs
+  before the auth hook in Fastify, so each request carries a real body — an invalid one
+  would return 400 and prove nothing. A route added without `preHandler:
+  app.authenticate` fails this test (an unknown route throws “add a schema-valid
+  request”), which makes it a standing drift guard rather than a snapshot of today’s
+  handlers.
+- **Two-account isolation is asserted over real HTTP, then re-read as the owner.**
+  Alice creates a folder, a file with an encrypted version, a tag, a share, a trashed
+  file, a trashed folder and an upload job; Bob then calls every route that takes one
+  of those ids and gets `404` for all of them — detail, rename, delete, tag replacement,
+  bulk trash, version list/download/restore, folder rename/delete, tag rename/delete,
+  share revoke, trash restore/purge, upload read/chunk/finalize/cancel. The owner’s
+  file is then re-read: name, favorite, folder and tag set are unchanged, the share
+  token still resolves publicly, the trash still lists both items, and the upload job
+  is not cancelled. Lists (`files`, `folders`, `tags`, `trash`, `shares?fileId`,
+  `audit`), search, `library/summary`, `insights` and the vault return nothing of
+  Alice’s for Bob.
+- **Cross-account resources answer 404, not 403.** Every lookup is scoped by owner in
+  the query itself, so a foreign id is indistinguishable from a missing one; that is
+  deliberate and matches the SRS’s “never confirm the existence of another account’s
+  data”. `forbidden()` (403) exists in the error module but no route reaches it.
+- **The web tier is a second boundary.** With no session cookie the Next proxy returns
+  `401 {"code":"AUTH_REQUIRED"}` with `cache-control: no-store` for `/api/shares`,
+  `/api/uploads` and the chunk upload route, and every authenticated page redirects to
+  `/sign-in` from the server layout. One ordering bug was found and fixed: the chunk
+  proxy validated the `x-chunk-checksum` header *before* resolving the session, so an
+  anonymous caller got a 400 that described the expected header. It now answers 401
+  first.
+- **Public capability edge cases**: a wrong-length token is `400 VALIDATION_ERROR`, a
+  well-formed unknown token is `404 SHARE_NOT_FOUND`, revocation is `410
+  SHARE_REVOKED` for both view and download, the public payload contains no owner id
+  or email (asserted key-by-key), and a refused download is audited for the owner
+  while a second account’s audit stays empty.
+
+**End-to-end browser run (two accounts)**
+
+- Signed out, `/files` redirected to `/sign-in`; the proxy answered 401 for the owner
+  routes while `/api/public/shares/<token>` still worked (404 for an unknown token,
+  never a login redirect).
+- Account A (`milestone5@example.com`, seeded over the API with one pending file and
+  one folder) saw *1 file*, `account-a-sweep.txt` and *Account A folder*.
+- Signed out, browser Back did not resurrect the cached library: history re-entered
+  `/sign-in`, and the page contained no file or folder names.
+- Account B (a fresh identity) saw *0 files*, an empty folder list, an empty
+  `/insights` (0 files / 0 B / 0 folders / 0 tags), and the search
+  `/files?q=account-a-sweep` returned *No matching files*; no B page contained A’s
+  file or folder name.
+- Signing back in as A restored the file and folder, and the IndexedDB `owner` store
+  held exactly `milestone5@example.com` — no B record, and no A record while B was
+  active.
+
+**Clean-deployment validation**
+
+Run from a clone of the repository into a scratch directory (no `node_modules`, no
+`.next`, no `.env`, no `.data`) with this milestone's changes applied as a patch, on
+Windows, Node 24.x, pnpm 9.15.9:
+
+| Step | Result |
+|---|---|
+| `pnpm install --frozen-lockfile` | pass — 224 packages, 12.9 s, lockfile unchanged |
+| `pnpm db:migrate` | pass — all 13 migrations applied from an empty database |
+| `pnpm seed` | pass — `demo@stackbase.local`, 6 folders / 14 files / 3 tags |
+| `pnpm build` | pass — production Next build, every route |
+| `pnpm test` (twice) | pass after the timeout fix — API 18 files / 168 tests, web 13 / 99 |
+| `pnpm dev` API on the seeded DB | pass — health 200, dev sign-in, 12 live files / 5 folders, setup status *local, connected* |
+| `pnpm db:reset` → migrate → seed | pass — recreates, re-applies all 13 migrations, re-seeds |
+| `pnpm storage:verify --dry-run` | pass — reports 0 stored objects on a fresh database |
+| API in `NODE_ENV=production` | pass — boots with `AUTH_MODE=supabase`, `STORAGE_PROVIDER=telegram`; health 200 |
+| Supabase token matrix | pass — a locally minted RS256 token (issuer `<url>/auth/v1`, audience `authenticated`, JWKS served locally) returns the right user; expired, wrong audience, wrong issuer and wrong signing key all return `401 AUTH_REQUIRED` |
+| Production route surface | pass — `POST /api/v1/dev/session` is 404; an upload with no linked Telegram account is `409 STORAGE_DISCONNECTED`; setup status reports `not_configured` |
+
+What the run found, and what was changed:
+
+1. **A validly signed token for a missing identity returned 500.** In Supabase mode the
+token is verified first; provisioning then inserted a `profiles` row whose foreign key
+points at `auth.users`, so a token for a deleted user (or from a project sharing the
+signing key) surfaced as an unhandled foreign-key error. `app.authenticate` now checks
+the identity once, before any handler, and answers `401 AUTH_REQUIRED` with “This
+session no longer matches an account in this deployment”. Covered by a new case in
+`security-sweep.test.ts`.
+2. **The web suite could time out on a fresh machine.** Every jsdom environment is
+built per file (~3 s each); under load the first render in
+`dashboard-cards.test.tsx` exceeded the default 5 s test timeout and failed in the
+clone (it passed in isolation). `testTimeout` is now 15 s, with a comment explaining
+why. `pool: 'vmThreads'` was tried first and broke three files, so it was reverted.
+3. **The blocker: the web app cannot sign in with Supabase Auth.** The sign-in screen
+posts to `POST /api/v1/dev/session`, which production does not register. A deployed
+web app therefore has no way to authenticate a real Supabase user, so the milestone
+exit criterion is not met. This is the next piece of work (see below).
+4. **PGlite is still accepted in production.** With `DATABASE_URL` empty the API uses
+the embedded single-process database even under `NODE_ENV=production`. That is
+deliberate for a self-hosted single instance and is now stated in the setup guide's
+production checklist; a multi-instance deployment must point `DATABASE_URL` at
+PostgreSQL.
+5. **CORS echoes the configured origin.** `@fastify/cors` with a string origin sets
+`access-control-allow-origin` to `WEB_ORIGIN` regardless of the request's `Origin`.
+Browsers compare the two, and the API authenticates with bearer tokens rather than
+cookies, so no cross-site read is possible; it is noted here rather than changed.
 
 ## Changed files
 
@@ -159,8 +268,21 @@ PWA assets: `public/{sw.js,offline.html,manifest.webmanifest,favicon.svg}` (new)
 `scripts/generate-icons.mjs` (new).
 
 Tests: `test/offline-metadata.test.ts` (new), `test/offline-queue.test.ts` (new),
-`test/sw-policy.test.ts` (new). `fake-indexeddb` was added as a web devDependency so
-the real IndexedDB code paths run under Vitest.
+`test/sw-policy.test.ts` (new), `apps/api/test/security-sweep.test.ts` (new).
+`fake-indexeddb` was added as a web devDependency so the real IndexedDB code paths run
+under Vitest.
+
+Security fixes: `apps/web/src/app/api/uploads/[uploadId]/chunks/[chunkNumber]/route.ts`
+now resolves the session before validating the chunk checksum header, and
+`apps/api/src/app.ts` refuses a validly signed token whose identity is not in
+`auth.users` with a 401 instead of letting a foreign-key violation become a 500.
+
+Test tooling: `apps/web/vitest.config.ts` raises `testTimeout` to 15 s so a cold jsdom
+environment cannot fail an otherwise healthy render test.
+
+Docs: `docs/setup/local-development.md` gains a production checklist (validated vs.
+open, the PGlite caveat, TLS/origins, secrets, operator checks) and two troubleshooting
+rows.
 
 Docs: this report; `README.md` status and report links (previously still Milestone 4).
 
@@ -171,8 +293,10 @@ No API or database changes were needed: the queue replays through the existing
 
 | Check | Result |
 |---|---|
-| `pnpm -r test` (API 17 files / 152 tests) | pass — the existing suites were unchanged by this pass |
+| `pnpm -r test` (API 18 files / 168 tests) | pass — including the 16-test security sweep; the other suites were unchanged |
 | `pnpm -r test` (web 13 files / 99 tests) | pass — including the three new offline suites |
+| `security-sweep.test.ts` (16) | pass — 47 anonymous calls all 401; 34 cross-account requests: every by-id call 404 and every list/aggregate returned none of the owner’s rows, with the owner’s data unchanged afterwards; public share key set, revocation and audit assertions |
+| Security / E2E browser run | pass — signed-out page redirect and proxy 401s, A→B→A account switch with no cross-visible data, Back after sign-out (below) |
 | `offline-metadata.test.ts` (5) | pass — read-back per account, another account's mirror never returned, previous account dropped on switch, same account kept, sign-out clears mirror **and** queue |
 | `offline-queue.test.ts` (9) | pass — apply against an unchanged file, conflict instead of overwrite, hold while offline, keep on refusal, keep on failed version check, drop only when the resource is gone, conflicted work left for a human, per-account replay isolation, discard |
 | `sw-policy.test.ts` (5) | pass — the harness loads the real `sw.js` with a fake `self`/`caches` and dispatches events: precache on install, `/api` and cross-origin requests pass through uncached, public asset cached then served, failed navigation falls back to the offline shell, old cache version deleted |
@@ -222,7 +346,9 @@ as the existing `milestone5@example.com` account with its `milestone-5.txt`:
    Escape returned focus to *Actions for ubuntu-24.04.iso* (earlier: `<body>`), while
    the folder dialog returned to *Actions for Documents*, and
    Tab/Shift+Tab cycled through the dialog (Chrome briefly focuses its chrome between
-   cycles; page content stays inert). Focus rings render as a 2 px amber ink outline.
+   cycles; page content stays inert). The focus indicator is the global
+   `:focus-visible` rule (2 px `--ring`, 2 px offset), whose colour now clears 3:1 on
+   every surface in both themes.
    The contrast sweep at `/files`, `/settings`, `/shared`, `/insights`, `/` and the
    dark theme found the three failures listed above, all clear after the token changes;
    `/sign-in`, the 404 page and the offline shell are clean at 390 px. The 24×24
@@ -274,22 +400,35 @@ as the existing `milestone5@example.com` account with its `milestone-5.txt`:
   Safari (including iOS dialog and IndexedDB differences) were not tested.
 - **Menus keep their chosen side while open.** A viewport resize with a menu open can
   leave it on the old side until it is reopened.
-- **No end-to-end automation.** The browser pass above was manual; the repository has no
-  Playwright-style harness.
+- **No browser automation.** The API sweep is automated, but the two-account browser
+  run above was driven by hand (through the preview harness) and the repository has no
+  Playwright-style suite that runs in CI.
+- **The sweep runs against the dev auth provider.** Cross-account isolation is proven
+  at the route layer and by the RLS suite (which assumes the `authenticated` role and
+  sets `request.jwt.claims` as Supabase does), but a live Supabase project was not used
+  to sign two real users in; that belongs to clean-deployment validation.
+- **First paint is not hydrating instantly.** A click on *Continue* immediately after
+  the sign-in page loads can be ignored before hydration; the same click succeeds a
+  moment later and the native form submit works without JavaScript. Not changed here
+  because the production build does not show it.
 - `docs/setup/local-development.md` does not yet document the offline behavior beyond
   this report; the setup guide still stops at local development and Supabase deployment.
 
 ## Remaining Milestone 6 work
 
-1. **Security, integration and end-to-end tests**: two-account isolation and a
-   signed-out 401/403 sweep over the full route list, plus an automated end-to-end
-   harness for the critical flows the manual passes have covered so far.
-2. **Clean-deployment validation**: fresh clone → install → migrate → seed → build →
-   run with Supabase Auth and the Telegram provider, documented well enough for an
-   independent developer; the exit criterion depends on this, not on local PWA and
-   accessibility checks.
-3. **Optional follow-ups**: lock body scroll for modal dialogs, and decide whether the
-   tablet breakpoint should gain the collapsible sidebar described in C9.
+1. **Supabase Auth sign-in (blocking the exit criterion).** The sign-in screen must
+   talk to the project's GoTrue endpoint instead of `POST /api/v1/dev/session`, keep the
+   access token in the existing httpOnly cookie, refresh it before it expires, and
+   revoke it on sign-out. Email + password is the sensible first method because it needs
+   no SMTP configuration in the operator's project; magic links can follow. In
+   `AUTH_MODE=dev` the current local form stays as-is.
+2. **Live-provider validation.** With a real Supabase project and a linked Telegram
+   account: sign in through the UI, upload, download and preview a file, link and unlink
+   Telegram from Settings, and run `pnpm storage:verify`. This is the part the local
+   JWKS harness cannot stand in for.
+3. **Optional follow-ups**: lock body scroll for modal dialogs, decide whether the
+   tablet breakpoint should gain the collapsible sidebar described in C9, and add a
+   Playwright harness that replays the two-account browser run in CI.
 
 **Exit criterion:** an independent developer can deploy and operate StackBase with
 their own accounts — not yet validated.

@@ -14,5 +14,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx'],
+    // Each jsdom environment costs seconds to build, so with every file running
+    // in its own worker the first render can exceed the default 5 s timeout on
+    // a busy machine. The tests are still ordinary renders; only the ceiling
+    // moves.
+    testTimeout: 15_000,
   },
 });

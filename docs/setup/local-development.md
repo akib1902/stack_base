@@ -184,6 +184,47 @@ upload pipeline).
 4. The web app needs a Supabase sign-in screen before it can be deployed. Until that
    ships (a later milestone), `AUTH_MODE=dev` is the supported local and self-hosted path.
 
+## Production checklist
+
+The items below were exercised from a clean clone against a throwaway configuration:
+`pnpm install --frozen-lockfile`, `pnpm db:migrate` (13 migrations from scratch),
+`pnpm seed`, `pnpm build`, `pnpm test`, `pnpm db:reset`, and an API started with
+`NODE_ENV=production`, `AUTH_MODE=supabase` and `STORAGE_PROVIDER=telegram`. See the
+clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
+
+1. **Authentication is Supabase-only in production.** `NODE_ENV=production` with
+   `AUTH_MODE=dev` refuses to boot, and `POST /api/v1/dev/session` is never registered.
+   Bearer tokens are verified against `SUPABASE_URL` + `/auth/v1` with audience
+   `authenticated`; an expired token, a wrong audience, a wrong issuer or a token signed
+   with another key all return `401 AUTH_REQUIRED`.
+2. **A signed token for an unknown identity is refused.** If the token's `sub` is not in
+   `auth.users` (deleted user, or a token from a project that shares the signing key) the
+   API answers `401` with “This session no longer matches an account in this deployment”
+   rather than failing deeper as a 500.
+3. **Storage must be Telegram in production.** `STORAGE_PROVIDER=local` with
+   `NODE_ENV=production` refuses to boot. With `STORAGE_PROVIDER=telegram` and no linked
+   account yet, uploads return `409 STORAGE_DISCONNECTED` and setup status reports
+   `not_configured`, which is what the Settings screen displays.
+4. **The web app cannot sign in yet under Supabase Auth.** This is the one open blocker
+   for a production deployment: the sign-in screen only implements local development
+   identities. Set `AUTH_MODE=dev` for any web deployment for now; do not expose a
+   production deployment with the dev sign-in reachable.
+5. **The database.** `DATABASE_URL` empty selects the embedded PGlite database, and that
+   is still accepted in production. It is a single-process database kept in
+   `apps/api/.data/pglite` — fine for a self-hosted single-instance deployment, not for
+   more than one API process. Point `DATABASE_URL` at the Supabase Postgres connection
+   string (with the migrations applied by `supabase db push`) for anything else.
+6. **Origins and TLS.** `WEB_ORIGIN` must be the exact public web origin; the API only
+   allows that origin in CORS. Terminate TLS in front of both services and keep
+   `API_BASE_URL` a server-side value in `apps/web/.env.local`.
+7. **Secrets stay out of the repository.** `apps/api/.env` holds `DEV_AUTH_SECRET`,
+   `SESSION_ENCRYPTION_KEY` and `SUPABASE_JWT_SECRET`; none of them may be committed, and
+   the session key must not change after a Telegram account is linked (it seals the
+   stored MTProto session).
+8. **Operator checks.** `pnpm storage:verify --email <address> --dry-run` re-hashes every
+   stored object without changing anything (it reports “Verifying 0 stored object(s)” on
+   a fresh database with no uploads).
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
@@ -199,3 +240,5 @@ upload pipeline).
 | Settings shows *Development storage* | That is the local filesystem provider working as intended outside production |
 | Download fails with a decryption error | The stored ciphertext does not match its manifest; run `pnpm storage:verify` and re-upload |
 | `db:reset` refuses to run | `DATABASE_URL` is set; drop and recreate that database deliberately instead |
+| Every request returns 401 “This session no longer matches an account in this deployment” | The token is signed correctly but its user is gone from `auth.users`; sign in again. Tokens are not revoked by Supabase when a user is deleted, so this check is what closes that window |
+| The web app has no way to sign in against Supabase | Not implemented yet: the sign-in screen only issues local development sessions. Use `AUTH_MODE=dev` |

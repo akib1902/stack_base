@@ -6,7 +6,7 @@ files are encrypted in the browser so the server never sees plaintext.
 
 The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 
-> **Status: Milestone 5 complete; Milestone 6 in progress (PWA and offline).**
+> **Status: Milestone 5 complete; Milestone 6 in progress (release readiness).**
 > Authentication, owner-scoped authorization, the full database schema with row-level
 > security, the metadata library, the `stackbase/1` client-side encryption format,
 > provider-neutral storage (local filesystem + Telegram MTProto), chunked encrypted
@@ -16,9 +16,13 @@ The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 > retention, revocable share links, the audit trail, offline metadata, an installable
 > manifest and service worker, and a queued offline-operation store with conflict
 > detection are implemented and tested. The responsive/accessibility pass covers
-> overflow, contrast, focus and touch targets on every screen. End-to-end automation
-> and clean-deployment validation remain for Milestone 6; the Supabase sign-in screen
-> is not implemented yet, and the UI never pretends otherwise.
+> overflow, contrast, focus and touch targets on every screen, and a security sweep
+> driven by the real route table proves that all 47 authenticated endpoints reject
+> anonymous callers and that one account cannot read or change another's data.
+> A clean-clone deployment check (install, migrate, seed, build, tests, and a
+> production-mode API verified against locally minted Supabase tokens) passes. The one
+> open blocker for release is the Supabase sign-in screen: the web app still signs in
+> with local development identities only, and the UI never pretends otherwise.
 > See the [Milestone 5](docs/reports/milestone-5.md) and
 > [Milestone 6](docs/reports/milestone-6.md) reports and the
 > [encryption format](docs/architecture/encryption-format.md).

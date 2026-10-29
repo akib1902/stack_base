@@ -1,5 +1,7 @@
 import { UPLOAD_CHUNK_CHECKSUM_HEADER, UPLOAD_CHUNK_CONTENT_TYPE } from '@stackbase/contracts';
+import { UnauthenticatedError } from '@/lib/api/client';
 import { errorResponse, forwardBinary } from '@/lib/api/proxy';
+import { getSessionToken } from '@/lib/auth/session';
 
 interface Params {
   params: Promise<{ uploadId: string; chunkNumber: string }>;
@@ -8,6 +10,10 @@ interface Params {
 /** One encrypted chunk; ciphertext only, bounds enforced by the API. */
 export async function PUT(request: Request, { params }: Params): Promise<Response> {
   try {
+    // The session is checked before any input validation, so an anonymous caller
+    // always gets the same 401 — never a hint about the expected headers.
+    if (!(await getSessionToken())) throw new UnauthenticatedError();
+
     const { uploadId, chunkNumber } = await params;
     const checksum = request.headers.get(UPLOAD_CHUNK_CHECKSUM_HEADER);
     if (!checksum) {

@@ -67,7 +67,23 @@ export async function buildApp({
       throw authRequired('A bearer access token is required.');
     }
     // Identity always comes from the verified token, never from client input.
-    request.user = await verifyToken(token);
+    const identity = await verifyToken(token);
+
+    // A correctly signed token can outlive the account it names: the user was
+    // deleted from Supabase, or the token came from a project that shares the
+    // signing key. Refuse it here so the failure is a 401 instead of a foreign
+    // key violation surfacing as a 500 in whichever handler runs first.
+    const { rows } = await db.query<{ exists: boolean }>(
+      'select exists (select 1 from auth.users where id = $1) as "exists"',
+      [identity.id],
+    );
+    if (rows[0]?.exists !== true) {
+      throw authRequired(
+        'This session no longer matches an account in this deployment. Sign in again.',
+      );
+    }
+
+    request.user = identity;
   });
 
   await app.register(cors, {
