@@ -13,7 +13,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border bg-surface-raised/60 p-5">
-      <span className="rounded-lg bg-primary/10 p-2 text-primary" aria-hidden="true">
+      <span className="rounded-lg bg-primary/10 p-2 text-primary-ink" aria-hidden="true">
         {icon}
       </span>
       <div>

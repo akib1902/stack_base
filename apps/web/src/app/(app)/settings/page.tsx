@@ -184,7 +184,7 @@ export default async function SettingsPage() {
           title="Sharing"
           hint="Read-only, revocable links to one immutable version"
           action={
-            <Link href="/shared" className="text-xs font-medium text-primary hover:underline">
+            <Link href="/shared" className="text-xs font-medium text-primary-ink hover:underline">
               Manage links
             </Link>
           }

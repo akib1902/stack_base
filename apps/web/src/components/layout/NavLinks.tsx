@@ -70,7 +70,7 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
       )}
     >
       <Icon
-        className={cn('size-4 shrink-0', active ? 'text-primary' : 'text-muted')}
+        className={cn('size-4 shrink-0', active ? 'text-primary-ink' : 'text-muted')}
         aria-hidden="true"
       />
       <span className="truncate">{item.label}</span>

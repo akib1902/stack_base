@@ -78,7 +78,7 @@ export function LibraryToolbar({
             className={cn(
               VIEW_ITEM,
               view.view === 'grid'
-                ? 'border-primary/40 bg-primary/10 text-primary'
+                ? 'border-primary/40 bg-primary/10 text-primary-ink'
                 : 'border-border bg-surface text-muted hover:bg-surface-raised',
             )}
           >
@@ -91,7 +91,7 @@ export function LibraryToolbar({
             className={cn(
               VIEW_ITEM,
               view.view === 'list'
-                ? 'border-primary/40 bg-primary/10 text-primary'
+                ? 'border-primary/40 bg-primary/10 text-primary-ink'
                 : 'border-border bg-surface text-muted hover:bg-surface-raised',
             )}
           >
@@ -158,7 +158,7 @@ export function LibraryToolbar({
               offset: 0,
               fileId: null,
             })}
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-ink hover:underline"
           >
             Back to root
           </Link>

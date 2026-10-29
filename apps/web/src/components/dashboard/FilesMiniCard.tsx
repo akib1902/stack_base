@@ -38,7 +38,7 @@ export function FilesMiniCard({
         action={
           <Link
             href={recent ? '/recent' : '/files?sort=size_desc'}
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-ink hover:underline"
           >
             View all
           </Link>
@@ -55,7 +55,7 @@ export function FilesMiniCard({
               : 'Sizes appear here as soon as your library has files.'
           }
           footer={
-            <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+            <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
               Open library
             </Link>
           }

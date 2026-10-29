@@ -95,7 +95,7 @@ export default async function SharedPage() {
             title="No share links yet"
             description="Open a file’s details and choose “Share link” to create a revocable, read-only link to that version."
             footer={
-              <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+              <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
                 Browse all files
               </Link>
             }

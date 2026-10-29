@@ -6,16 +6,21 @@ files are encrypted in the browser so the server never sees plaintext.
 
 The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 
-> **Status: Milestone 4 — upload reliability and previews.** Authentication,
-> owner-scoped authorization, the full database schema with row-level security, the
-> metadata library, the `stackbase/1` client-side encryption format, provider-neutral
-> storage (local filesystem + Telegram MTProto), chunked encrypted uploads with
-> immutable versions, browser-side download/decryption, a durable queue that survives a
-> page refresh (pause/resume/retry with backoff and source-file reselection),
-> image/video/audio/PDF previews decrypted in the tab, and storage insights are
-> implemented and tested. Sharing, versions UI, offline/PWA and the Supabase sign-in
-> screen are **not** implemented yet; the UI never pretends otherwise. See the
-> [Milestone 4 report](docs/reports/milestone-4.md) and the
+> **Status: Milestone 5 complete; Milestone 6 in progress (PWA and offline).**
+> Authentication, owner-scoped authorization, the full database schema with row-level
+> security, the metadata library, the `stackbase/1` client-side encryption format,
+> provider-neutral storage (local filesystem + Telegram MTProto), chunked encrypted
+> uploads with immutable versions, browser-side download/decryption, a durable queue
+> that survives a page refresh (pause/resume/retry with backoff and source-file
+> reselection), decrypted previews, storage insights, version history, Trash with
+> retention, revocable share links, the audit trail, offline metadata, an installable
+> manifest and service worker, and a queued offline-operation store with conflict
+> detection are implemented and tested. The responsive/accessibility pass covers
+> overflow, contrast, focus and touch targets on every screen. End-to-end automation
+> and clean-deployment validation remain for Milestone 6; the Supabase sign-in screen
+> is not implemented yet, and the UI never pretends otherwise.
+> See the [Milestone 5](docs/reports/milestone-5.md) and
+> [Milestone 6](docs/reports/milestone-6.md) reports and the
 > [encryption format](docs/architecture/encryption-format.md).
 
 ---
@@ -119,6 +124,8 @@ docs/                  setup, architecture, decisions and milestone reports
 - [Local development and Supabase deployment](docs/setup/local-development.md)
 - [Encryption format `stackbase/1`](docs/architecture/encryption-format.md)
 - [Architecture decisions and documented deviations](docs/architecture/decisions.md)
+- [Milestone 6 report](docs/reports/milestone-6.md)
+- [Milestone 5 report](docs/reports/milestone-5.md)
 - [Milestone 4 report](docs/reports/milestone-4.md)
 - [Milestone 3 report](docs/reports/milestone-3.md)
 - [Milestone 1 report](docs/reports/milestone-1.md)

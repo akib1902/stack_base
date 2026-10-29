@@ -48,12 +48,12 @@ function StatusIcon({ status }: { status: UploadItem['status'] }) {
     return <X className="size-4 shrink-0 text-muted" aria-hidden="true" />;
   }
   if (status === 'paused') {
-    return <PauseCircle className="size-4 shrink-0 text-primary" aria-hidden="true" />;
+    return <PauseCircle className="size-4 shrink-0 text-primary-ink" aria-hidden="true" />;
   }
   if (status === 'needs_source_file') {
     return <FileWarning className="size-4 shrink-0 text-warning" aria-hidden="true" />;
   }
-  return <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />;
+  return <Loader2 className="size-4 shrink-0 animate-spin text-primary-ink" aria-hidden="true" />;
 }
 
 function RowActions({ item }: { item: UploadItem }) {
@@ -163,7 +163,7 @@ export function UploadPanel() {
     >
       <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <UploadCloud className="size-4 text-primary" aria-hidden="true" />
+          <UploadCloud className="size-4 text-primary-ink" aria-hidden="true" />
           Uploads
           <span className="text-xs font-normal text-muted">
             {active > 0 ? `${active} active` : `${finished} finished`}

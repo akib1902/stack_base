@@ -53,7 +53,7 @@ export function ThemePicker({ current }: { current: Theme }) {
               <span className="flex w-full items-center justify-between gap-2">
                 <span className="text-sm font-semibold">{option.label}</span>
                 {active ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-primary-ink">
                     <Check className="size-3.5" aria-hidden="true" />
                     Current
                   </span>

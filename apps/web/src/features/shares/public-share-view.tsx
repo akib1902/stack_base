@@ -86,7 +86,7 @@ export function PublicShareView({
   return (
     <Card className="w-full max-w-lg">
       <div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary-ink">
           <ShieldCheck className="size-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">

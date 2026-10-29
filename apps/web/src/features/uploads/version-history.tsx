@@ -118,7 +118,7 @@ export function VersionHistory({
   return (
     <section aria-label="Version history" className="space-y-2">
       <div className="flex items-center gap-2">
-        <History className="size-3.5 text-primary" aria-hidden="true" />
+        <History className="size-3.5 text-primary-ink" aria-hidden="true" />
         <h3 className="text-xs font-semibold">Version history</h3>
         <span className="text-[11px] text-muted">
           {versions.length} {versions.length === 1 ? 'version' : 'versions'}

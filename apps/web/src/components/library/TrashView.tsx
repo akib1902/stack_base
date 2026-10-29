@@ -86,7 +86,7 @@ export function TrashView({
         title="Trash is empty"
         description="Deleted files and folders stay here until you restore or permanently remove them."
         footer={
-          <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+          <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
             Browse all files
           </Link>
         }

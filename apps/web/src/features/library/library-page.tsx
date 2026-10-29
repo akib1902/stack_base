@@ -109,7 +109,7 @@ export async function LibraryPage({
             : 'Nothing matches the current filters.'
         }
         footer={
-          <Link href={clearHref} className="text-xs font-medium text-primary hover:underline">
+          <Link href={clearHref} className="text-xs font-medium text-primary-ink hover:underline">
             Clear filters
           </Link>
         }
@@ -120,7 +120,7 @@ export async function LibraryPage({
         title="No favorites yet"
         description="Open a file’s details and mark it as a favorite to keep it one click away."
         footer={
-          <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+          <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
             Browse all files
           </Link>
         }
@@ -131,7 +131,7 @@ export async function LibraryPage({
         title="Nothing here yet"
         description="Recently touched files appear here once your library has content."
         footer={
-          <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+          <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
             Go to All files
           </Link>
         }

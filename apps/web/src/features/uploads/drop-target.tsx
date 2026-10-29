@@ -51,7 +51,7 @@ export function UploadDropTarget({
     >
       {dragging ? (
         <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-card bg-surface/85">
-          <p className="flex items-center gap-2 text-sm font-medium text-primary">
+          <p className="flex items-center gap-2 text-sm font-medium text-primary-ink">
             <UploadCloud className="size-4" aria-hidden="true" />
             Drop to encrypt and upload
           </p>

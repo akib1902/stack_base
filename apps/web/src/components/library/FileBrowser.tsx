@@ -130,7 +130,8 @@ export function FileBrowser({
   emptyState: ReactNode;
 }) {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());  const [openFile, setOpenFile] = useState<FileSummary | null>(
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [openFile, setOpenFile] = useState<FileSummary | null>(
     () => files.find((file) => file.id === view.fileId) ?? null,
   );
   const [editingFolder, setEditingFolder] = useState<FolderSummary | null>(null);
@@ -148,6 +149,18 @@ export function FileBrowser({
       const visible = new Set(files.map((file) => file.id));
       const next = new Set([...current].filter((id) => visible.has(id)));
       return next.size === current.size ? current : next;
+    });
+  }, [files]);
+
+  // `openFile` is a snapshot from when the dialog opened. Follow newer server
+  // revisions (an online save, or a queued change that just replayed) so the
+  // next offline edit is based on the current version rather than conflicting
+  // with the user's own earlier change.
+  useEffect(() => {
+    setOpenFile((current) => {
+      if (!current) return current;
+      const fresh = files.find((file) => file.id === current.id);
+      return fresh && fresh !== current ? fresh : current;
     });
   }, [files]);
 
@@ -257,7 +270,7 @@ export function FileBrowser({
                     allSelected ? new Set() : new Set(files.map((file) => file.id)),
                   )
                 }
-                className="text-[11px] font-medium text-primary hover:underline"
+                className="text-[11px] font-medium text-primary-ink hover:underline"
               >
                 {allSelected ? 'Deselect all' : 'Select all'}
               </button>

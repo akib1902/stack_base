@@ -6,9 +6,9 @@ type BadgeVariant = 'success' | 'muted' | 'warning' | 'danger' | 'primary';
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
   success: 'border-success/25 bg-success/10 text-success',
   muted: 'border-border bg-surface-raised text-muted',
-  warning: 'border-primary/25 bg-primary/10 text-primary',
+  warning: 'border-primary/25 bg-primary/10 text-primary-ink',
   danger: 'border-error/25 bg-error/10 text-error',
-  primary: 'border-primary/30 bg-primary/10 text-primary',
+  primary: 'border-primary/30 bg-primary/10 text-primary-ink',
 };
 
 export function Badge({

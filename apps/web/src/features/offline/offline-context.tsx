@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import {
   createContext,
   useCallback,
@@ -59,6 +60,7 @@ export function OfflineProvider({
   const [queued, setQueued] = useState<QueuedOperation[]>([]);
 
   const userId = user.id;
+  const router = useRouter();
 
   const refresh = useCallback(async () => {
     const operations = await listOperations(userId);
@@ -87,8 +89,13 @@ export function OfflineProvider({
     };
     const summary = await replayQueue(userId, deps);
     await refresh();
+    // Applied changes change server data, so the surfaces built from it (the
+    // file list, and any open details dialog) must re-render with the new
+    // revision. Without this, the next offline edit would be based on the
+    // version from before the replay and be flagged as a false conflict.
+    if (summary.applied > 0) router.refresh();
     return summary;
-  }, [refresh, userId]);
+  }, [refresh, router, userId]);
 
   const discard = useCallback(
     async (id: string) => {

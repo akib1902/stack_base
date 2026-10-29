@@ -9,13 +9,16 @@
   --surface: #ffffff;
   --surface-raised: #f3efe7;
   --primary: #d97706;
+  /* Text/icon accent on light surfaces; --primary itself only reaches 3:1. */
+  --primary-ink: #92400e;
   --primary-foreground: #1f1a12;
   --foreground: #29251f;
-  --muted-foreground: #77716a;
+  --muted-foreground: #6b655e;
   --border: #e8e1d6;
   --success: #2f7d57;
   --error: #c2413a;
-  --ring: #d97706;
+  /* 3:1 against every light surface for the focus indicator (1.4.11). */
+  --ring: #92400e;
 
   /* File-category accents as `r g b` triplets, so rgb()/color-mix() work. */
   --tint-amber: 217 119 6;
@@ -32,6 +35,7 @@
   --surface: #202328;
   --surface-raised: #292d33;
   --primary: #f2a93b;
+  --primary-ink: #f2a93b;
   --primary-foreground: #17191c;
   --foreground: #f1f2f4;
   --muted-foreground: #a4aab3;
@@ -53,6 +57,7 @@
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
   --color-primary-foreground: var(--primary-foreground);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted-foreground);

@@ -12,7 +12,7 @@ function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string
   return (
     <div className="rounded-xl border border-border bg-surface-raised/50 px-4 py-3">
       <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted">
-        <span className="text-primary">{icon}</span>
+        <span className="text-primary-ink">{icon}</span>
         {label}
       </p>
       <p className="mt-1 text-lg font-semibold tracking-tight">{value}</p>
@@ -142,7 +142,7 @@ export default async function InsightsPage() {
                 <li key={file.id} className="flex items-center justify-between gap-3 py-2">
                   <a
                     href={`/files?file=${encodeURIComponent(file.id)}`}
-                    className="min-w-0 truncate text-xs font-medium hover:text-primary"
+                    className="min-w-0 truncate text-xs font-medium hover:text-primary-ink"
                     title={file.name}
                   >
                     {file.name}
@@ -170,7 +170,7 @@ export default async function InsightsPage() {
                 <li key={folder.id} className="flex items-center justify-between gap-3 py-2">
                   <a
                     href={`/files?folderId=${encodeURIComponent(folder.id)}`}
-                    className="min-w-0 truncate text-xs font-medium hover:text-primary"
+                    className="min-w-0 truncate text-xs font-medium hover:text-primary-ink"
                     title={folder.name}
                   >
                     {folder.name}
@@ -215,7 +215,7 @@ export default async function InsightsPage() {
                     <li key={file.id} className="flex items-center justify-between gap-3">
                       <a
                         href={`/files?file=${encodeURIComponent(file.id)}`}
-                        className="min-w-0 truncate text-[11px] text-muted hover:text-primary"
+                        className="min-w-0 truncate text-[11px] text-muted hover:text-primary-ink"
                         title={file.name}
                       >
                         {file.name}

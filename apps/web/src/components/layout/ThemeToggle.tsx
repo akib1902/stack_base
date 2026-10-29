@@ -27,7 +27,7 @@ export function ThemeToggle({ current }: { current: Theme }) {
               className={cn(
                 'grid size-8 place-items-center rounded-full transition-colors',
                 active
-                  ? 'bg-surface-raised text-primary'
+                  ? 'bg-surface-raised text-primary-ink'
                   : 'text-muted hover:bg-surface-raised hover:text-foreground',
               )}
             >

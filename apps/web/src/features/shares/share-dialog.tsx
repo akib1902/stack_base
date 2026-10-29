@@ -287,7 +287,7 @@ export function ShareDialog({
 
         <section aria-label="Existing share links" className="space-y-2">
           <div className="flex items-center gap-2">
-            <Share2 className="size-3.5 text-primary" aria-hidden="true" />
+            <Share2 className="size-3.5 text-primary-ink" aria-hidden="true" />
             <h3 className="text-xs font-semibold">Links for this file</h3>
             <span className="text-[11px] text-muted">{shares.length}</span>
           </div>

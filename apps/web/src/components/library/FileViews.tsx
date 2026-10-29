@@ -16,7 +16,7 @@ function FavoriteMark({ favorite }: { favorite: boolean }) {
   if (!favorite) return null;
   return (
     <span title="Favorite">
-      <Star className="size-3.5 fill-primary text-primary" aria-hidden="true" />
+      <Star className="size-3.5 fill-primary text-primary-ink" aria-hidden="true" />
       <span className="sr-only">Favorite</span>
     </span>
   );
@@ -87,13 +87,15 @@ export function FileGrid({
             )}
           >
             <div className="flex items-start justify-between gap-2">
-              <input
-                type="checkbox"
-                className={CHECKBOX}
-                checked={selected}
-                onChange={() => onToggle(file.id)}
-                aria-label={`Select ${file.name}`}
-              />
+              <label className="-m-1 grid size-6 shrink-0 cursor-pointer place-items-center">
+                <input
+                  type="checkbox"
+                  className={CHECKBOX}
+                  checked={selected}
+                  onChange={() => onToggle(file.id)}
+                  aria-label={`Select ${file.name}`}
+                />
+              </label>
               <div className="flex items-center gap-1">
                 <FavoriteMark favorite={file.favorite} />
                 <DropdownMenu label={`Actions for ${file.name}`}>
@@ -168,13 +170,15 @@ export function FileList({
                 selected ? 'bg-primary/5' : 'hover:bg-surface-raised/60',
               )}
             >
-              <input
-                type="checkbox"
-                className={CHECKBOX}
-                checked={selected}
-                onChange={() => onToggle(file.id)}
-                aria-label={`Select ${file.name}`}
-              />
+              <label className="-m-1 grid size-6 shrink-0 cursor-pointer place-items-center">
+                <input
+                  type="checkbox"
+                  className={CHECKBOX}
+                  checked={selected}
+                  onChange={() => onToggle(file.id)}
+                  aria-label={`Select ${file.name}`}
+                />
+              </label>
 
               <button
                 type="button"

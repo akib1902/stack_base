@@ -21,7 +21,7 @@ export function CategoryBento({
         title="Categories"
         hint="Real counts from your metadata; choose a tile to filter the library"
         action={
-          <Link href="/files" className="text-xs font-medium text-primary hover:underline">
+          <Link href="/files" className="text-xs font-medium text-primary-ink hover:underline">
             Open library
           </Link>
         }

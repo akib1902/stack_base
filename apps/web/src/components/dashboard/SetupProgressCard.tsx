@@ -59,7 +59,7 @@ export function SetupProgressCard({
         action={
           <Link
             href="/settings"
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            className="inline-flex items-center gap-1 text-xs font-medium text-primary-ink hover:underline"
           >
             Settings
             <ArrowRight className="size-3.5" aria-hidden="true" />

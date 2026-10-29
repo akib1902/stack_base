@@ -221,7 +221,7 @@ export function FileDetailsDialog({
         {queuedNotice ? (
           <p
             role="status"
-            className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-primary"
+            className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs leading-relaxed text-primary-ink"
           >
             Saved to this device. It will be sent when you are back online, and Settings →
             Offline and cache shows its status if it conflicts with another change.
@@ -308,7 +308,7 @@ export function FileDetailsDialog({
                       className={cn(
                         'rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
                         active
-                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          ? 'border-primary/40 bg-primary/10 text-primary-ink'
                           : 'border-border bg-surface text-foreground/80 hover:bg-surface-raised',
                       )}
                     >
@@ -361,7 +361,7 @@ export function FileDetailsDialog({
             {file.contentStatus === 'ready' ? (
               'Encrypted version available'
             ) : (
-              <span className="inline-flex items-center gap-1 text-primary">
+              <span className="inline-flex items-center gap-1 text-primary-ink">
                 <Info className="size-3" aria-hidden="true" />
                 Metadata only
               </span>

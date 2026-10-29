@@ -29,7 +29,7 @@ export function OfflineIndicator() {
       role="status"
       aria-live="polite"
       data-online={online}
-      className="inline-flex max-w-[190px] items-center gap-1.5 truncate rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted data-[online=false]:border-primary/40 data-[online=false]:bg-primary/10 data-[online=false]:text-primary"
+      className="inline-flex max-w-[190px] items-center gap-1.5 truncate rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted data-[online=false]:border-primary/40 data-[online=false]:bg-primary/10 data-[online=false]:text-primary-ink"
       title={
         online
           ? 'Connectivity restored; queued changes sync automatically.'

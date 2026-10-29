@@ -34,7 +34,7 @@ export function CardHeading({
   return (
     <div className="mb-4 flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-2.5">
-        {icon ? <span className="mt-0.5 text-primary">{icon}</span> : null}
+        {icon ? <span className="mt-0.5 text-primary-ink">{icon}</span> : null}
         <div className="min-w-0">
           <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
           {hint ? <p className="mt-0.5 text-xs leading-relaxed text-muted">{hint}</p> : null}

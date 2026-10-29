@@ -142,7 +142,7 @@ export function OfflinePreferences({ settings }: { settings: UserSettings }) {
                 <div className="flex shrink-0 items-center gap-2">
                   <span
                     data-status={operation.status}
-                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted data-[status=conflict]:border-error/40 data-[status=conflict]:text-error data-[status=failed]:border-error/40 data-[status=failed]:text-error data-[status=pending]:text-primary"
+                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted data-[status=conflict]:border-error/40 data-[status=conflict]:text-error data-[status=failed]:border-error/40 data-[status=failed]:text-error data-[status=pending]:text-primary-ink"
                   >
                     {STATUS_LABEL[operation.status] ?? operation.status}
                   </span>

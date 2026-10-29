@@ -22,7 +22,7 @@ export function TrashCard({
         title="Trash"
         hint="Recoverable until you remove it"
         action={
-          <Link href="/trash" className="text-xs font-medium text-primary hover:underline">
+          <Link href="/trash" className="text-xs font-medium text-primary-ink hover:underline">
             Review
           </Link>
         }
