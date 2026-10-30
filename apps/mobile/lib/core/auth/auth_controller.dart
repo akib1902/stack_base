@@ -164,12 +164,23 @@ class AuthController extends AsyncNotifier<AuthState> {
     state = AsyncData(
       AuthState(status: AuthStatus.signedIn, session: session),
     );
+    // `/me` and setup status are account-scoped. Without this, signing in as a
+    // second account would render the first account's cached metadata until a
+    // manual refresh.
+    ref.invalidate(meProvider);
+    ref.invalidate(setupStatusProvider);
   }
 
   Future<void> _discardPreviousAccount(String nextUserId) async {
     final previous = state.value?.session?.userId;
     if (previous == null || previous == nextUserId) return;
-    await ref.read(secureSessionStoreProvider).clearAccount(previous);
+    try {
+      await ref.read(secureSessionStoreProvider).clearAccount(previous);
+    } catch (_) {
+      // The previous account's keys are namespaced and are never read for the
+      // new account. Do not fail a successful sign-in on a keystore cleanup
+      // error; the next explicit sign-out retries the cleanup.
+    }
   }
 
   void _setBusy(bool busy) {

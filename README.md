@@ -23,8 +23,10 @@ The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 > production-mode API verified against locally minted Supabase tokens) passes. The one
 > open blocker for release is the Supabase sign-in screen: the web app still signs in
 > with local development identities only, and the UI never pretends otherwise.
-> See the [Milestone 5](docs/reports/milestone-5.md) and
-> [Milestone 6](docs/reports/milestone-6.md) reports and the
+> The Flutter client has completed **Mobile Milestone 1** (shell and authentication).
+> See the [Milestone 5](docs/reports/milestone-5.md),
+> [Milestone 6](docs/reports/milestone-6.md) and
+> [Mobile Milestone 1](docs/reports/mobile-milestone-1.md) reports and the
 > [encryption format](docs/architecture/encryption-format.md).
 
 ---
@@ -91,6 +93,10 @@ apps/
     src/features/      auth, library, settings, setup, encryption, uploads features
     src/lib/           API client, crypto (vault + file format), session, theme
     test/              crypto vectors, file format, upload pipeline suites
+  mobile/              Flutter Android/iOS client (Mobile Milestone 1)
+    lib/core/          config, Dio API, auth repositories, secure storage, models
+    lib/features/      auth, home, local, cloud, settings, shell, uploads
+    test/              config, API, auth, secure storage, widget suites
 packages/
   contracts/           TypeBox schemas shared by API and web
 supabase/
@@ -125,12 +131,16 @@ docs/                  setup, architecture, decisions and milestone reports
 
 ## Mobile
 
-A Flutter client for Android and iOS is the next delivery track, under `apps/mobile/`.
-Its Mobile Milestone 0 integration audit is complete; no mobile application code has
-been scaffolded yet. The audit verifies the shared API, schema, authentication and
-`stackbase/1` crypto compatibility, records the platform limits honestly, and names the
-mobile-specific API gaps that must be closed before beta.
+`apps/mobile/` is the Flutter client for Android and iOS. **Mobile Milestone 1 is
+complete:** it signs in against the existing API (development sessions or Supabase
+password auth), restores the session from the platform keystore, maps API errors,
+and renders the four-tab Amber Minimal / Graphite Terminal shell with real account,
+library, storage, vault and health states. Cloud browsing, local file access,
+encryption and transfers remain later milestones; the app says so instead of faking
+them. See the [mobile README](apps/mobile/README.md) for build commands and the
+[JDK 17–21 requirement](apps/mobile/README.md#requirements).
 
+- [Mobile Milestone 1 report](docs/reports/mobile-milestone-1.md)
 - [Mobile architecture and decisions](docs/mobile/architecture.md)
 - [Verified mobile API contract](docs/mobile/api-contract.md)
 - [Android/iOS capabilities and permissions](docs/mobile/platform-capabilities.md)

@@ -5,6 +5,7 @@ import '../core/providers.dart';
 import '../features/setup/presentation/setup_screen.dart';
 import '../features/setup/presentation/startup_failure_screen.dart';
 import 'router/app_router.dart';
+import 'theme/motion.dart';
 import 'theme/theme.dart';
 import 'theme/theme_controller.dart';
 
@@ -17,6 +18,11 @@ class StackBaseApp extends ConsumerWidget {
     final startupFailure = ref.watch(startupFailureProvider);
     final themeMode =
         ref.watch(themeModeProvider).value ?? ThemeMode.system;
+    final reduceMotion = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
 
     final theme = StackBaseTheme.light();
     final darkTheme = StackBaseTheme.dark();
@@ -28,6 +34,7 @@ class StackBaseApp extends ConsumerWidget {
         theme: theme,
         darkTheme: darkTheme,
         themeMode: themeMode,
+        themeAnimationDuration: reduceMotion ? Duration.zero : Motion.base,
         home: SetupScreen(config: config),
       );
     }
@@ -39,6 +46,7 @@ class StackBaseApp extends ConsumerWidget {
         theme: theme,
         darkTheme: darkTheme,
         themeMode: themeMode,
+        themeAnimationDuration: reduceMotion ? Duration.zero : Motion.base,
         home: StartupFailureScreen(
           config: config,
           details: startupFailure,
@@ -52,6 +60,7 @@ class StackBaseApp extends ConsumerWidget {
       theme: theme,
       darkTheme: darkTheme,
       themeMode: themeMode,
+      themeAnimationDuration: reduceMotion ? Duration.zero : Motion.base,
       builder: _withoutMotion,
       routerConfig: ref.watch(appRouterProvider),
     );
