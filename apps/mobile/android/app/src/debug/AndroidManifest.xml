@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Debug only: a local API is normally http://10.0.2.2:8787 or a LAN
+         address. Release builds keep the platform default (HTTPS only). -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

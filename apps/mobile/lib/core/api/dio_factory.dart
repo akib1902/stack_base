@@ -173,7 +173,12 @@ class AuthInterceptor extends Interceptor {
       handler.next(options);
       return;
     }
-    final token = await accessToken();
+    // A retry after refresh carries the exact accepted token, so a stale
+    // accessToken() source can never overwrite it and trigger a refresh loop.
+    final override = options.extra['authTokenOverride'];
+    final token = override is String && override.isNotEmpty
+        ? override
+        : await accessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['authorization'] = 'Bearer $token';
     }
@@ -196,7 +201,8 @@ class AuthInterceptor extends Interceptor {
       return;
     }
 
-    if (options.extra['authRetried'] == true) {
+    if (options.extra['authRetried'] == true ||
+        options.extra['authTokenOverride'] != null) {
       onSessionExpired();
       handler.next(err);
       return;
@@ -215,16 +221,18 @@ class AuthInterceptor extends Interceptor {
     }
 
     final retry = options.copyWith(
-      extra: {...options.extra, 'authRetried': true},
+      extra: {
+        ...options.extra,
+        'authRetried': true,
+        'authTokenOverride': token,
+      },
       headers: {...options.headers, 'authorization': 'Bearer $token'},
     );
     try {
       final response = await _dio.fetch<dynamic>(retry);
       handler.resolve(response);
     } on DioException catch (nextError) {
-      if (nextError.response?.statusCode == 401) {
-        onSessionExpired();
-      }
+      // The retried request's own interceptor already reported a second 401.
       handler.next(nextError);
     } catch (error, stackTrace) {
       handler.next(

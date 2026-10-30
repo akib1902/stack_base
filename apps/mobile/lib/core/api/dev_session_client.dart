@@ -36,12 +36,18 @@ class DevSessionResponse {
   }
 }
 
+/// Seam used by the development repository and its tests.
+abstract interface class DevSessionApi {
+  Future<DevSessionResponse> createSession(String email);
+}
+
 /// Unauthenticated client for the development-only session route.
-class DevSessionClient {
+class DevSessionClient implements DevSessionApi {
   DevSessionClient(this._dio);
 
   final Dio _dio;
 
+  @override
   Future<DevSessionResponse> createSession(String email) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(

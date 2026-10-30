@@ -12,7 +12,7 @@ import 'secure_session_store.dart';
 /// runs with `AUTH_MODE=dev`; release builds reject this mode at startup.
 class DevAuthRepository implements AuthRepository {
   DevAuthRepository({
-    required DevSessionClient client,
+    required DevSessionApi client,
     required SecureSessionStore store,
     required bool isDebug,
   }) : _client = client,
@@ -23,7 +23,7 @@ class DevAuthRepository implements AuthRepository {
     }
   }
 
-  final DevSessionClient _client;
+  final DevSessionApi _client;
   final SecureSessionStore _store;
   final bool _isDebug;
   final _sessions = StreamController<AuthSession?>.broadcast();
@@ -57,7 +57,7 @@ class DevAuthRepository implements AuthRepository {
   }
 
   Future<AuthSession> signInWithDevSession(String email) async {
-    final response = await _client.createSession(email);
+    final response = await _client.createSession(email.trim().toLowerCase());
     final session = AuthSession(
       userId: response.userId,
       email: response.email,

@@ -52,7 +52,43 @@ class StackBaseApp extends ConsumerWidget {
       theme: theme,
       darkTheme: darkTheme,
       themeMode: themeMode,
+      builder: _withoutMotion,
       routerConfig: ref.watch(appRouterProvider),
     );
+  }
+
+  /// Removes page-transition animation when the platform asks for reduced
+  /// motion. The app does not add decorative motion elsewhere.
+  static Widget _withoutMotion(BuildContext context, Widget? child) {
+    if (child == null) return const SizedBox.shrink();
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (!reduced) return child;
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: _InstantPageTransitionsBuilder(),
+            TargetPlatform.iOS: _InstantPageTransitionsBuilder(),
+          },
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _InstantPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _InstantPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
   }
 }
