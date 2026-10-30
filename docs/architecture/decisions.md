@@ -4,6 +4,10 @@ Decisions taken while implementing Milestone 1, with the deviations from the SRS
 documented explicitly (SRS final rule 14). Each record states the context, the decision
 and the consequences.
 
+Mobile-specific decisions (MADR-001…012) live in
+[mobile/architecture.md](../mobile/architecture.md); they extend these records and do not
+replace them.
+
 ---
 
 ## ADR-001 — Two database drivers: PGlite locally, `pg` for PostgreSQL/Supabase

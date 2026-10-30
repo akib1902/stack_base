@@ -123,6 +123,20 @@ docs/                  setup, architecture, decisions and milestone reports
   sealed with AES-256-GCM under `SESSION_ENCRYPTION_KEY` before it is stored, and pending
   logins live in memory only.
 
+## Mobile
+
+A Flutter client for Android and iOS is the next delivery track, under `apps/mobile/`.
+Its Mobile Milestone 0 integration audit is complete; no mobile application code has
+been scaffolded yet. The audit verifies the shared API, schema, authentication and
+`stackbase/1` crypto compatibility, records the platform limits honestly, and names the
+mobile-specific API gaps that must be closed before beta.
+
+- [Mobile architecture and decisions](docs/mobile/architecture.md)
+- [Verified mobile API contract](docs/mobile/api-contract.md)
+- [Android/iOS capabilities and permissions](docs/mobile/platform-capabilities.md)
+- [Mobile milestone plan](docs/mobile/milestone-plan.md)
+- [Mobile Milestone 0 report](docs/reports/mobile-milestone-0.md)
+
 ## Documentation
 
 - [Local development and Supabase deployment](docs/setup/local-development.md)

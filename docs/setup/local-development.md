@@ -38,7 +38,7 @@ validated at startup; the process refuses to boot with a clear list of problems.
 | `STORAGE_PROVIDER` | `local` | `local` (filesystem, development only) or `telegram` |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | — | Required when `STORAGE_PROVIDER=telegram`; from <https://my.telegram.org> |
 | `SESSION_ENCRYPTION_KEY` | — | 32 bytes base64 (`openssl rand -base64 32`); seals the stored Telegram session |
-| `MAX_UPLOAD_BYTES` | `17179869184` | 1 GiB–16 GiB, single-file upload cap |
+| `MAX_UPLOAD_BYTES` | `2147483648` | 2 GiB default; allowed 1 MiB–16 GiB, single-file upload cap |
 | `MAX_ACTIVE_UPLOADS` | `4` | Unfinished upload jobs allowed per user (1–32) |
 | `LOG_LEVEL` | `info` | Pino level; authorization headers are redacted |
 
