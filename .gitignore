@@ -15,6 +15,10 @@ coverage/
 .data/
 **/.data/
 
+# Locally downloaded mobile toolchain (Flutter SDK) and package caches
+.toolchain/
+.tmp-toolchain/
+
 # Logs and OS cruft
 *.log
 .DS_Store
