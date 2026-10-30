@@ -31,6 +31,10 @@ class DevAuthRepository implements AuthRepository {
   AuthSession? _current;
   Future<AuthSession?>? _refreshing;
 
+  void dispose() {
+    unawaited(_sessions.close());
+  }
+
   @override
   AuthMode get mode => AuthMode.dev;
 

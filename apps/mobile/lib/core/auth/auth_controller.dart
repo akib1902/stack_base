@@ -149,7 +149,7 @@ class AuthController extends AsyncNotifier<AuthState> {
     String? message =
         'Your session expired. Sign in again to continue.',
   }) async {
-    if (_expiring || state.valueOrNull?.status == AuthStatus.expired) return;
+    if (_expiring || state.value?.status == AuthStatus.expired) return;
     _expiring = true;
     try {
       await _repository?.clearLocal();
@@ -167,20 +167,20 @@ class AuthController extends AsyncNotifier<AuthState> {
   }
 
   Future<void> _discardPreviousAccount(String nextUserId) async {
-    final previous = state.valueOrNull?.session?.userId;
+    final previous = state.value?.session?.userId;
     if (previous == null || previous == nextUserId) return;
     await ref.read(secureSessionStoreProvider).clearAccount(previous);
   }
 
   void _setBusy(bool busy) {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(busy: busy, clearMessage: busy));
   }
 
   void _onSession(AuthSession? session) {
     if (!_ready) return;
-    final current = state.valueOrNull;
+    final current = state.value;
     if (session == null) {
       if (current == null || current.status == AuthStatus.signedOut) return;
       state = const AsyncData(AuthState.signedOut());

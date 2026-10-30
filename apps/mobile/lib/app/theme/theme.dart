@@ -1,11 +1,12 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'tokens.dart';
 
 abstract final class StackBaseTheme {
-  static ThemeData light() => _build(Brightness.light, Ink.light);
+  static ThemeData light() => _build(Brightness.light, StackBasePalette.light);
 
-  static ThemeData dark() => _build(Brightness.dark, Ink.dark);
+  static ThemeData dark() => _build(Brightness.dark, StackBasePalette.dark);
 
   static ThemeData _build(Brightness brightness, StackBaseColors colors) {
     final baseScheme = ColorScheme.fromSeed(

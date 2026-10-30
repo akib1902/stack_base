@@ -29,6 +29,11 @@ class SupabaseAuthRepository implements AuthRepository {
   AuthSession? _current;
   Future<AuthSession?>? _refreshing;
 
+  void dispose() {
+    unawaited(_authSubscription.cancel());
+    unawaited(_sessions.close());
+  }
+
   @override
   AuthMode get mode => AuthMode.supabase;
 

@@ -44,6 +44,7 @@ class ApiException implements Exception {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
+      case DioExceptionType.transformTimeout:
         return ApiException(
           code: 'TIMEOUT',
           message: 'The server did not respond in time.',

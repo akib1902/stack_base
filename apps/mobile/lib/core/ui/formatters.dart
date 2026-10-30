@@ -28,8 +28,8 @@ String initialsFor(String? displayName, String? email) {
   final source = (displayName ?? email ?? '').trim();
   if (source.isEmpty) return '?';
   final parts = source.split(RegExp(r'[\s@._-]+')).where((p) => p.isNotEmpty);
-  if (parts.isEmpty) return source.characters.first.toUpperCase();
-  final first = parts.first.characters.first;
-  final last = parts.length > 1 ? parts.elementAt(1).characters.first : '';
-  return '$first$last'.toUpperCase();
+  if (parts.isEmpty) return source.substring(0, 1).toUpperCase();
+  final first = parts.first.substring(0, 1);
+  final second = parts.length > 1 ? parts.elementAt(1).substring(0, 1) : '';
+  return '$first$second'.toUpperCase();
 }

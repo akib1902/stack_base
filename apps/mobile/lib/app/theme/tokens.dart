@@ -19,7 +19,7 @@ abstract final class Radii {
   static const chipSmall = 10.0;
 }
 
-abstract final class Ink {
+abstract final class StackBasePalette {
   static const light = StackBaseColors(
     background: Color(0xFFFAF8F4),
     surface: Color(0xFFFFFFFF),

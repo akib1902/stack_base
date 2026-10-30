@@ -45,7 +45,7 @@ class EnvironmentValues {
 /// renders [problems] with the exact defines required to fix them.
 @immutable
 class AppConfig {
-  AppConfig._({
+  const AppConfig._({
     required this.isDebug,
     required this.apiBaseUrl,
     required this.supabaseUrl,

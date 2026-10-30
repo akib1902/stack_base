@@ -32,7 +32,8 @@ class ApiClient {
         data: update.toJson(),
         options: Options(contentType: Headers.jsonContentType),
       );
-      return _parse(response.data, UserSettings.fromJson);
+      final parsed = _parse(response.data, UserSettings.fromJson);
+      return parsed;
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     } on FormatException catch (error) {
@@ -54,7 +55,8 @@ class ApiClient {
           responseType: ResponseType.json,
         ),
       );
-      return _parse(response.data, HealthResponse.fromJson);
+      final parsed = _parse(response.data, HealthResponse.fromJson);
+      return parsed;
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     } on FormatException catch (error) {

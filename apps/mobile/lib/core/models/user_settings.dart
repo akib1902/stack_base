@@ -47,17 +47,55 @@ abstract class UserSettings with _$UserSettings {
       _$UserSettingsFromJson(json);
 }
 
-@freezed
-@JsonSerializable(includeIfNull: false)
-abstract class UserSettingsUpdate with _$UserSettingsUpdate {
-  const factory UserSettingsUpdate({
-    ServerTheme? theme,
-    DefaultView? defaultView,
-    FileSort? defaultSort,
-    int? trashRetentionDays,
-    bool? offlineEnabled,
-  }) = _UserSettingsUpdate;
+/// Partial PATCH body. Null fields are omitted, never sent as JSON null.
+class UserSettingsUpdate {
+  const UserSettingsUpdate({
+    this.theme,
+    this.defaultView,
+    this.defaultSort,
+    this.trashRetentionDays,
+    this.offlineEnabled,
+  });
 
-  factory UserSettingsUpdate.fromJson(Map<String, dynamic> json) =>
-      _$UserSettingsUpdateFromJson(json);
+  final ServerTheme? theme;
+  final DefaultView? defaultView;
+  final FileSort? defaultSort;
+  final int? trashRetentionDays;
+  final bool? offlineEnabled;
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (theme != null) 'theme': theme!.wireValue,
+      if (defaultView != null) 'defaultView': defaultView!.wireValue,
+      if (defaultSort != null) 'defaultSort': defaultSort!.wireValue,
+      if (trashRetentionDays != null)
+        'trashRetentionDays': trashRetentionDays,
+      if (offlineEnabled != null) 'offlineEnabled': offlineEnabled,
+    };
+  }
+}
+
+extension ServerThemeWire on ServerTheme {
+  String get wireValue => switch (this) {
+    ServerTheme.amber => 'amber',
+    ServerTheme.graphite => 'graphite',
+  };
+}
+
+extension DefaultViewWire on DefaultView {
+  String get wireValue => switch (this) {
+    DefaultView.grid => 'grid',
+    DefaultView.list => 'list',
+  };
+}
+
+extension FileSortWire on FileSort {
+  String get wireValue => switch (this) {
+    FileSort.updatedAt => 'updated_at',
+    FileSort.createdAt => 'created_at',
+    FileSort.nameAsc => 'name_asc',
+    FileSort.nameDesc => 'name_desc',
+    FileSort.sizeDesc => 'size_desc',
+    FileSort.sizeAsc => 'size_asc',
+  };
 }
