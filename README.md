@@ -23,10 +23,11 @@ The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 > production-mode API verified against locally minted Supabase tokens) passes. The one
 > open blocker for release is the Supabase sign-in screen: the web app still signs in
 > with local development identities only, and the UI never pretends otherwise.
-> The Flutter client has completed **Mobile Milestone 1** (shell and authentication).
-> See the [Milestone 5](docs/reports/milestone-5.md),
-> [Milestone 6](docs/reports/milestone-6.md) and
-> [Mobile Milestone 1](docs/reports/mobile-milestone-1.md) reports and the
+> The Flutter client has completed **Mobile Milestone 2** (cloud browser and per-account
+> offline metadata cache). See the [Milestone 5](docs/reports/milestone-5.md),
+> [Milestone 6](docs/reports/milestone-6.md),
+> [Mobile Milestone 1](docs/reports/mobile-milestone-1.md) and
+> [Mobile Milestone 2](docs/reports/mobile-milestone-2.md) reports and the
 > [encryption format](docs/architecture/encryption-format.md).
 
 ---

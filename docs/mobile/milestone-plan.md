@@ -1,6 +1,6 @@
 # StackBase mobile milestone plan
 
-**Status:** Mobile Milestone 0 complete · **Date:** 30 October 2026
+**Status:** Mobile Milestone 2 complete · **Date:** 31 October 2026
 
 This plan follows the instruction's rule: work in milestones, do not rewrite the web app,
 do not break API contracts, and report files, features, tests, limitations, security,
@@ -103,7 +103,9 @@ build toolchain installed; a local API running; no unresolved decision about aut
 
 ---
 
-### Mobile Milestone 2 — Cloud read-only browser and metadata cache
+### Mobile Milestone 2 — Cloud read-only browser and metadata cache ✅
+
+**Status:** complete on 31 October 2026 — [report](../reports/mobile-milestone-2.md).
 
 **Goal:** browse the real StackBase namespace from the phone, with a trustworthy offline
 read cache.
@@ -426,8 +428,8 @@ was not verified.
 | Milestone | Status | Evidence |
 |---|---|---|
 | M0 — integration audit | **Complete** | [Mobile Milestone 0 report](../reports/mobile-milestone-0.md) |
-| M1 — foundation/auth | Not started | Needs the toolchain and accepted decisions |
-| M2 — cloud read-only | Not started | Depends on M1 |
+| M1 — foundation/auth | **Complete** | [Mobile Milestone 1 report](../reports/mobile-milestone-1.md) |
+| M2 — cloud read-only | **Complete** | [Mobile Milestone 2 report](../reports/mobile-milestone-2.md) |
 | M3 — crypto core | Not started | Depends on M1 and native build |
 | M4 — upload/download | Not started | Depends on M2 + M3 |
 | M5 — cloud operations | Not started | Depends on M4 |

@@ -75,7 +75,7 @@ class CloudLibraryRepository {
         folders: [for (final row in folderRows) _folderFromRow(row)],
         tags: [for (final row in tagRows) _tagFromRow(row)],
         summary: summary,
-        syncedAt: summaryRow.syncedAt,
+        syncedAt: summaryRow.syncedAt.toUtc(),
         truncated: summaryRow.truncated,
       );
     } on FormatException {
@@ -129,7 +129,7 @@ class CloudLibraryRepository {
         batch.insert(
           _database.cachedSummaries,
           CachedSummariesCompanion.insert(
-            id: 1,
+            id: const Value(1),
             payload: jsonEncode(summary.toJson()),
             syncedAt: syncedAt,
             truncated: Value(truncated),
@@ -221,8 +221,8 @@ class CloudLibraryRepository {
         for (final tag in rawTags)
           TagSummary.fromJson(Map<String, dynamic>.from(tag as Map)),
       ],
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      createdAt: row.createdAt.toUtc(),
+      updatedAt: row.updatedAt.toUtc(),
     );
   }
 
@@ -233,8 +233,8 @@ class CloudLibraryRepository {
       parentFolderId: row.parentFolderId,
       fileCount: row.fileCount,
       folderCount: row.folderCount,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
+      createdAt: row.createdAt.toUtc(),
+      updatedAt: row.updatedAt.toUtc(),
     );
   }
 
@@ -244,7 +244,7 @@ class CloudLibraryRepository {
       name: row.name,
       colorToken: row.colorToken,
       fileCount: row.fileCount,
-      createdAt: row.createdAt,
+      createdAt: row.createdAt.toUtc(),
     );
   }
 }

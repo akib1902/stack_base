@@ -139,7 +139,11 @@ class CloudLibraryController extends AsyncNotifier<CloudLibraryState> {
     _cache = cache;
     _visibleCount = pageSize;
     final initial = _fromCache(cache, refreshing: cache == null);
-    unawaited(_sync(repository));
+    // Runs after the provider stores the initial state; a microtask can still
+    // observe AsyncLoading here, which would silently skip the first sync.
+    unawaited(
+      Future<void>.delayed(Duration.zero, () => _sync(repository)),
+    );
     return initial;
   }
 

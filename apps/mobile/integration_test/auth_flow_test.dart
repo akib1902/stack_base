@@ -8,7 +8,7 @@ import 'package:stackbase_mobile/core/auth/secure_session_store.dart';
 
 /// On-device development sign-in and account isolation. Requires the local API:
 ///
-///   flutter test integration_test/auth_flow_test.dart -d <device> \
+///   flutter test integration_test/auth_flow_test.dart -d `<device>` \
 ///     --dart-define=API_BASE_URL=http://10.0.2.2:8787 \
 ///     --dart-define=AUTH_MODE=dev
 void main() {
@@ -78,7 +78,7 @@ Future<void> _signIn(WidgetTester tester, String email) async {
   if (find.text(email).evaluate().isEmpty) {
     final visible = tester
         .widgetList<Text>(find.byType(Text))
-        .map((text) => text.data ?? '\<rich>')
+        .map((text) => text.data ?? '<rich>')
         .join(' | ');
     fail('Sign-in did not reach the shell. Visible text: $visible');
   }

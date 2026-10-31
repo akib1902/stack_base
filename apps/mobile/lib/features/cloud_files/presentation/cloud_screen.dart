@@ -5,13 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
 import '../../../core/api/api_exception.dart';
-import '../../../core/models/library.dart';
 import '../../../core/models/user_settings.dart';
 import '../../../core/ui/components/offline_banner.dart';
 import '../../../core/ui/components/section_header.dart';
 import '../../../core/ui/components/stackbase_app_bar.dart';
 import '../../../core/ui/components/state_message.dart';
-import '../../../core/ui/formatters.dart';
 import '../domain/cloud_query.dart';
 import 'cloud_controller.dart';
 import 'widgets/cloud_sheets.dart';
@@ -399,7 +397,7 @@ class _CloudUnavailable extends StatelessWidget {
   const _CloudUnavailable({required this.error, required this.onRetry});
 
   final Object error;
-  final Future<void> Function() onRetry;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {

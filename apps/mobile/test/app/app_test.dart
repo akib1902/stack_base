@@ -8,9 +8,11 @@ import 'package:stackbase_mobile/app/theme/motion.dart';
 import 'package:stackbase_mobile/core/auth/secure_session_store.dart';
 import 'package:stackbase_mobile/core/config/app_config.dart';
 import 'package:stackbase_mobile/core/providers.dart';
+import 'package:stackbase_mobile/features/cloud_files/presentation/cloud_controller.dart';
 
 import '../support/fake_auth_repository.dart';
 import '../support/fixtures.dart';
+import '../support/library_fixtures.dart';
 import '../support/memory_secure_store.dart';
 
 void main() {
@@ -31,6 +33,9 @@ void main() {
           meProvider.overrideWith((ref) async => meFixture),
           setupStatusProvider.overrideWith((ref) async => setupFixture),
           healthProvider.overrideWith((ref) async => healthFixture),
+          cloudLibraryRepositoryProvider.overrideWithValue(
+            FakeCloudLibraryRepository(cache: libraryCacheFixture()),
+          ),
           packageInfoProvider.overrideWith(
             (ref) async => PackageInfo(
               appName: 'StackBase',
@@ -125,7 +130,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Cloud browsing arrives next'), findsOneWidget);
+    expect(find.text('Cloud files'), findsOneWidget);
+    expect(find.text('report.pdf'), findsWidgets);
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
@@ -175,7 +181,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Cloud browsing arrives next'), findsOneWidget);
+    expect(find.text('Cloud files'), findsOneWidget);
   });
 
   testWidgets('tablet width uses a navigation rail', (tester) async {

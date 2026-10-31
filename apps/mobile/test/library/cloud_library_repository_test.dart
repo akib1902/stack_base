@@ -92,7 +92,7 @@ void main() {
   });
 
   test('a failed refresh throws and leaves the previous cache intact', () async {
-    final (api, adapter) = clientWith([
+    final (api, _) = clientWith([
       ScriptedReply(200, {
         'items': [folderJson()],
       }),
@@ -117,16 +117,19 @@ void main() {
     );
     await repository.refresh();
 
-    adapter.replies
-      ..clear()
-      ..add(
-        const ScriptedReply(400, {
-          'error': {'code': 'VALIDATION_ERROR', 'message': 'Nope.'},
-        }),
-      );
+    final (failingApi, _) = clientWith([
+      const ScriptedReply(400, {
+        'error': {'code': 'VALIDATION_ERROR', 'message': 'Nope.'},
+      }),
+    ]);
+    final failingRepository = CloudLibraryRepository(
+      api: failingApi,
+      database: database,
+      clock: () => fixtureNow,
+    );
 
     await expectLater(
-      repository.refresh(),
+      failingRepository.refresh(),
       throwsA(
         isA<ApiException>().having(
           (error) => error.code,
@@ -136,7 +139,7 @@ void main() {
       ),
     );
 
-    final stored = await repository.readCache();
+    final stored = await failingRepository.readCache();
     expect(stored, isNotNull);
     expect(stored!.files, hasLength(1));
     expect(stored.syncedAt, fixtureNow);
