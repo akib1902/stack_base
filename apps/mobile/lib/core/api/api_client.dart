@@ -5,6 +5,7 @@ import '../models/library.dart';
 import '../models/me_response.dart';
 import '../models/setup_status.dart';
 import '../models/user_settings.dart';
+import '../models/vault.dart';
 import 'api_exception.dart';
 
 /// Typed access to the StackBase API. Milestone 2 adds the read-only library
@@ -97,6 +98,40 @@ class ApiClient {
     return _parse(data, StorageInsightsResponse.fromJson);
   }
 
+  /// The account's vault record, or null when no vault has been created yet.
+  /// Only ciphertext and non-secret KDF parameters are returned.
+  Future<VaultRecord?> fetchVault() async {
+    final data = await _getJson('encryption/vault');
+    return _parseVaultEnvelope(data);
+  }
+
+  /// One-time vault creation. A second attempt returns 409
+  /// `VAULT_ALREADY_EXISTS`; the caller must not replace the existing record.
+  Future<VaultRecord> createVault(CreateVaultRequest request) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'encryption/vault',
+        data: request.toJson(),
+        options: Options(contentType: Headers.jsonContentType),
+      );
+      final vault = _parseVaultEnvelope(response.data);
+      if (vault == null) {
+        throw const ApiException(
+          code: 'INTERNAL_ERROR',
+          message: 'The server did not return the created vault.',
+        );
+      }
+      return vault;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    } on FormatException catch (error) {
+      throw ApiException(
+        code: 'INTERNAL_ERROR',
+        message: 'Malformed vault response: ${error.message}',
+      );
+    }
+  }
+
   /// Unversioned readiness endpoint. Uses an absolute URL so the `/api/v1`
   /// base path is not prepended.
   Future<HealthResponse> fetchHealth() async {
@@ -139,6 +174,31 @@ class ApiClient {
       return data;
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
+    }
+  }
+
+  VaultRecord? _parseVaultEnvelope(Map<String, dynamic>? data) {
+    if (data == null) {
+      throw const ApiException(
+        code: 'INTERNAL_ERROR',
+        message: 'The server returned an empty vault response.',
+      );
+    }
+    final value = data['vault'];
+    if (value == null) return null;
+    if (value is! Map) {
+      throw const ApiException(
+        code: 'INTERNAL_ERROR',
+        message: 'The vault response did not match the contract.',
+      );
+    }
+    try {
+      return VaultRecord.fromJson(Map<String, dynamic>.from(value));
+    } on FormatException catch (error) {
+      throw ApiException(
+        code: 'INTERNAL_ERROR',
+        message: 'Malformed vault record: ${error.message}',
+      );
     }
   }
 

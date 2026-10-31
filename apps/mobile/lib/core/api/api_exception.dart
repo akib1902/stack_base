@@ -126,6 +126,8 @@ class ApiException implements Exception {
         return message;
       case 'FILE_TOO_LARGE':
         return 'That file is larger than this server allows.';
+      case 'VAULT_ALREADY_EXISTS':
+        return 'This account already has an encryption vault. Unlock it instead of creating a new one.';
       case 'STORAGE_DISCONNECTED':
         return 'Storage is disconnected. Reconnect it on the web app.';
       case 'STORAGE_RECONCILIATION_REQUIRED':

@@ -482,12 +482,11 @@ class _EncryptionCard extends StatelessWidget {
               const SizedBox(height: Space.x2),
               Text(
                 configured
-                    ? 'Your vault exists. Device unlock and encrypted previews '
-                          'arrive with the crypto milestone; this build never '
-                          'asks for a passphrase.'
-                    : 'Create the vault on the web app before encrypted '
-                          'uploads can start. No plaintext or key leaves the '
-                          'device.',
+                    ? 'Your vault exists. Unlock it in Settings to use '
+                          'encryption on this device; the passphrase and key '
+                          'stay in memory for the session only.'
+                    : 'Create the vault in Settings before encrypted uploads '
+                          'can start. No plaintext or key leaves the device.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colors.mutedForeground,
                 ),

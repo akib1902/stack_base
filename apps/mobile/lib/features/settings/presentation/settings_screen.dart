@@ -8,6 +8,7 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_controller.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/crypto/vault.dart';
 import '../../../core/models/me_response.dart';
 import '../../../core/models/setup_status.dart';
 import '../../../core/models/user_settings.dart';
@@ -17,6 +18,7 @@ import '../../../core/ui/components/section_header.dart';
 import '../../../core/ui/components/stackbase_app_bar.dart';
 import '../../../core/ui/components/status_pill.dart';
 import '../../../core/ui/formatters.dart';
+import '../../encryption/presentation/vault_controller.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -215,6 +217,7 @@ class SettingsScreen extends ConsumerWidget {
       },
     );
     if (confirmed == true) {
+      ref.read(vaultControllerProvider.notifier).lock();
       await ref.read(authControllerProvider.notifier).signOut();
     }
   }
@@ -421,13 +424,13 @@ class _ServerCard extends ConsumerWidget {
   }
 }
 
-class _SetupCard extends StatelessWidget {
+class _SetupCard extends ConsumerWidget {
   const _SetupCard({required this.setup});
 
   final AsyncValue<SetupStatusResponse> setup;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.stackColors;
     return AppCard(
       child: setup.when(
@@ -507,18 +510,330 @@ class _SetupCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: Space.x2),
-              Text(
-                'Vault unlock and key handling stay on the device and are '
-                'added with the crypto milestone. This screen never asks for '
-                'a passphrase.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.mutedForeground,
-                ),
-              ),
+              _VaultSection(configured: vaultConfigured),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+class _VaultSection extends ConsumerWidget {
+  const _VaultSection({required this.configured});
+
+  final bool configured;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.stackColors;
+    final vault = ref.watch(vaultControllerProvider);
+    return vault.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: Space.x2),
+        child: LinearProgressIndicator(minHeight: 3),
+      ),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.only(top: Space.x2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'The vault state could not be read.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.error),
+              ),
+            ),
+            TextButton(
+              onPressed: () => ref.invalidate(vaultControllerProvider),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+      data: (value) {
+        final hasVault =
+            value.record != null ||
+            value.phase == VaultPhase.locked ||
+            value.phase == VaultPhase.unlocked ||
+            configured;
+        final unlocked = value.phase == VaultPhase.unlocked;
+        final unavailable = value.phase == VaultPhase.unavailable;
+        final (label, tone) = unlocked
+            ? ('Unlocked', StatusTone.success)
+            : hasVault
+            ? ('Locked', StatusTone.warning)
+            : ('Not created', StatusTone.warning);
+        final explanation = switch (value.phase) {
+          VaultPhase.unlocked =>
+            'The vault key is in memory for this session. Lock it when you '
+                'finish.',
+          VaultPhase.locked =>
+            'The vault record is on this account. Unlock it to use encryption '
+                'on this device.',
+          VaultPhase.absent =>
+            'Create a vault before encrypted uploads can start. The passphrase '
+                'never leaves this device and cannot be recovered.',
+          VaultPhase.unavailable =>
+            value.message ?? 'The vault state is unavailable.',
+          VaultPhase.signedOut =>
+            'Sign in to manage the encryption vault.',
+        };
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: Space.x1),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'This device',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                StatusPill(label: label, tone: tone),
+              ],
+            ),
+            const SizedBox(height: Space.x1),
+            Text(
+              explanation,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: unavailable ? colors.error : colors.mutedForeground,
+              ),
+            ),
+            if (value.message != null && !unavailable) ...[
+              const SizedBox(height: Space.x1),
+              Text(
+                value.message!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.error),
+              ),
+            ],
+            if (value.busy) ...[
+              const SizedBox(height: Space.x2),
+              const LinearProgressIndicator(minHeight: 3),
+            ],
+            const SizedBox(height: Space.x2),
+            Wrap(
+              spacing: Space.x2,
+              runSpacing: Space.x2,
+              children: [
+                if (!hasVault && value.phase != VaultPhase.signedOut)
+                  FilledButton.icon(
+                    onPressed: value.busy ? null : () => _create(context, ref),
+                    icon: const Icon(Icons.add_moderator_outlined, size: 18),
+                    label: const Text('Create vault'),
+                  ),
+                if (hasVault &&
+                    !unlocked &&
+                    !unavailable &&
+                    value.phase != VaultPhase.signedOut)
+                  FilledButton.icon(
+                    onPressed: value.busy ? null : () => _unlock(context, ref),
+                    icon: const Icon(Icons.lock_open_rounded, size: 18),
+                    label: const Text('Unlock'),
+                  ),
+                if (unlocked)
+                  OutlinedButton.icon(
+                    onPressed: value.busy
+                        ? null
+                        : () => ref.read(vaultControllerProvider.notifier).lock(),
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                    label: const Text('Lock'),
+                  ),
+                if (unavailable)
+                  TextButton(
+                    onPressed: () => ref
+                        .read(vaultControllerProvider.notifier)
+                        .refresh(),
+                    child: const Text('Retry'),
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    final passphrase = await showDialog<String>(
+      context: context,
+      builder: (context) => const _VaultPassphraseDialog(
+        title: 'Create encryption vault',
+        description:
+            'Choose a passphrase of at least 12 characters. It is never '
+            'stored or sent to the server. If you lose it, the encrypted '
+            'files cannot be recovered.',
+        actionLabel: 'Create vault',
+        confirm: true,
+      ),
+    );
+    if (passphrase == null || !context.mounted) return;
+    await ref.read(vaultControllerProvider.notifier).createVault(passphrase);
+    if (!context.mounted) return;
+    final state = ref.read(vaultControllerProvider).value;
+    final message = state?.message;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          state?.phase == VaultPhase.unlocked
+              ? 'Vault created and unlocked for this session.'
+              : message ?? 'The vault could not be created.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _unlock(BuildContext context, WidgetRef ref) async {
+    final passphrase = await showDialog<String>(
+      context: context,
+      builder: (context) => const _VaultPassphraseDialog(
+        title: 'Unlock encryption vault',
+        description:
+            'Enter the passphrase for this vault. It stays on this device and '
+            'is never sent to the server.',
+        actionLabel: 'Unlock',
+        confirm: false,
+      ),
+    );
+    if (passphrase == null || !context.mounted) return;
+    await ref.read(vaultControllerProvider.notifier).unlock(passphrase);
+    if (!context.mounted) return;
+    final state = ref.read(vaultControllerProvider).value;
+    final message = state?.message;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          state?.phase == VaultPhase.unlocked
+              ? 'Vault unlocked for this session.'
+              : message ?? 'The vault could not be unlocked.',
+        ),
+      ),
+    );
+  }
+}
+
+class _VaultPassphraseDialog extends StatefulWidget {
+  const _VaultPassphraseDialog({
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+    required this.confirm,
+  });
+
+  final String title;
+  final String description;
+  final String actionLabel;
+  final bool confirm;
+
+  @override
+  State<_VaultPassphraseDialog> createState() =>
+      _VaultPassphraseDialogState();
+}
+
+class _VaultPassphraseDialogState extends State<_VaultPassphraseDialog> {
+  final _passphrase = TextEditingController();
+  final _confirmation = TextEditingController();
+  bool _obscure = true;
+  String? _error;
+
+  @override
+  void dispose() {
+    _passphrase.dispose();
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _passphrase.text;
+    if (value.length < VaultCrypto.minPassphraseLength) {
+      setState(() {
+        _error = 'Use at least ${VaultCrypto.minPassphraseLength} characters.';
+      });
+      return;
+    }
+    if (widget.confirm && _confirmation.text != value) {
+      setState(() => _error = 'The passphrases do not match.');
+      return;
+    }
+    Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.stackColors;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.description,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.mutedForeground,
+              ),
+            ),
+            const SizedBox(height: Space.x3),
+            TextField(
+              controller: _passphrase,
+              autofocus: true,
+              obscureText: _obscure,
+              textInputAction: widget.confirm
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              onSubmitted: (_) {
+                if (!widget.confirm) _submit();
+              },
+              decoration: InputDecoration(
+                labelText: 'Passphrase',
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _obscure = !_obscure),
+                  tooltip: _obscure ? 'Show passphrase' : 'Hide passphrase',
+                  icon: Icon(
+                    _obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
+              ),
+            ),
+            if (widget.confirm) ...[
+              const SizedBox(height: Space.x2),
+              TextField(
+                controller: _confirmation,
+                obscureText: _obscure,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+                decoration: const InputDecoration(
+                  labelText: 'Confirm passphrase',
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: Space.x2),
+              Text(
+                _error!,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: Text(widget.actionLabel)),
+      ],
     );
   }
 }

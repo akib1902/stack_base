@@ -57,6 +57,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.5"
+  archive:
+    dependency: transitive
+    description:
+      name: archive
+      sha256: "0d58d1fa1fddf6588251ccf2819f3fb3b6d0452c1b2813ac7413a05592bfbefe"
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.5.2"
   args:
     dependency: transitive
     description:
@@ -173,10 +181,10 @@ packages:
     dependency: transitive
     description:
       name: code_assets
-      sha256: bf394f466ba9205f1812a0433b392d6af280f155f56651eda7c18cc32ed493b8
+      sha256: "828110d598123b5ea96c00c9f3c72105bf79f8ee36c20a39b26209ade421ec57"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.1"
+    version: "2.1.0"
   collection:
     dependency: "direct main"
     description:
@@ -210,13 +218,21 @@ packages:
     source: hosted
     version: "3.1.2"
   crypto:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crypto
       sha256: e3626ae6270383c9e3a549f34c9e4cd26c09ae6a9adaab2bf4737a00340efdc4
       url: "https://pub.dev"
     source: hosted
     version: "3.0.8"
+  csslib:
+    dependency: transitive
+    description:
+      name: csslib
+      sha256: "09bad715f418841f976c77db72d5398dc1253c21fb9c0c7f0b0b985860b2d58e"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.2"
   cupertino_icons:
     dependency: "direct main"
     description:
@@ -487,6 +503,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  html:
+    dependency: transitive
+    description:
+      name: html
+      sha256: "43b67b8f43321ab066817dfac5619596c98bb1b61624e77203bb4351785f9699"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.15.7"
   http:
     dependency: transitive
     description:
@@ -672,10 +696,10 @@ packages:
     dependency: transitive
     description:
       name: native_toolchain_c
-      sha256: a1c26117c48cebe5677b0cf0e33a980a79a7c5577effc86f52e5a0d309cdcb60
+      sha256: "90eaad8059ebc2004a63810a4696ea9acdb02473e47ed3b6b3bafb100ac77e31"
       url: "https://pub.dev"
     source: hosted
-    version: "0.19.3"
+    version: "0.19.5"
   nm:
     dependency: transitive
     description:
@@ -688,10 +712,10 @@ packages:
     dependency: transitive
     description:
       name: objective_c
-      sha256: b7fb95a6d9a4f009edd63dc5ac69f07420b23a16161c6dd8660290b59c602e8e
+      sha256: "5c80c2ad6e2c0397de5db38c6d653e69616a3397e13aa7633bf39eb668f2041b"
       url: "https://pub.dev"
     source: hosted
-    version: "9.5.0"
+    version: "9.6.2"
   package_config:
     dependency: transitive
     description:
@@ -820,6 +844,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.3"
+  posix:
+    dependency: transitive
+    description:
+      name: posix
+      sha256: "613646d076944f3acc125830af935b48d4b8a57a388691547bbfd25b434f4d63"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.5.4"
   postgrest:
     dependency: transitive
     description:
@@ -961,6 +993,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  sodium:
+    dependency: "direct main"
+    description:
+      name: sodium
+      sha256: ecfcfc444ba1651c9b58cb3a84c6d925ab86c6206e40ab1ce0f5d674207d15d2
+      url: "https://pub.dev"
+    source: hosted
+    version: "4.1.2+1"
   source_gen:
     dependency: transitive
     description:
