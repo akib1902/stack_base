@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../models/library.dart';
 import '../models/me_response.dart';
 import '../models/setup_status.dart';
 import '../models/user_settings.dart';
 import 'api_exception.dart';
 
-/// Typed access to the endpoints Mobile Milestone 1 uses.
+/// Typed access to the StackBase API. Milestone 2 adds the read-only library
+/// endpoints; uploads, versions, trash and shares remain later milestones.
 class ApiClient {
   ApiClient({required Dio dio, required AppConfig config})
     : _dio = dio,
@@ -44,6 +46,57 @@ class ApiClient {
     }
   }
 
+  /// Full library summary: totals, nine category buckets, recent and largest.
+  Future<LibrarySummaryResponse> fetchLibrarySummary() async {
+    final data = await _getJson('library/summary');
+    return _parse(data, LibrarySummaryResponse.fromJson);
+  }
+
+  Future<FolderListResponse> fetchFolders() async {
+    final data = await _getJson('folders');
+    return _parse(data, FolderListResponse.fromJson);
+  }
+
+  Future<TagListResponse> fetchTags() async {
+    final data = await _getJson('tags');
+    return _parse(data, TagListResponse.fromJson);
+  }
+
+  /// One page of the server's file list. The cache sync pages through this
+  /// until `hasMore` is false; the UI itself filters the synced snapshot.
+  Future<FileListResponse> fetchFiles({
+    String? query,
+    LibraryCategory? category,
+    String? folderId,
+    bool favoritesOnly = false,
+    String? tagId,
+    FileSort? sort,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final params = <String, dynamic>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    };
+    final term = query?.trim();
+    if (term != null && term.isNotEmpty) params['q'] = term;
+    if (category != null) params['category'] = category.wireValue;
+    if (folderId != null) params['folderId'] = folderId;
+    if (favoritesOnly) params['favorite'] = 'true';
+    if (tagId != null) params['tagId'] = tagId;
+    if (sort != null) params['sort'] = sort.wireValue;
+
+    final data = await _getJson('files', queryParameters: params);
+    return _parse(data, FileListResponse.fromJson);
+  }
+
+  /// Storage insights. Computed by the server from real aggregates; the app
+  /// presents them read-only in Milestone 2.
+  Future<StorageInsightsResponse> fetchInsights() async {
+    final data = await _getJson('insights');
+    return _parse(data, StorageInsightsResponse.fromJson);
+  }
+
   /// Unversioned readiness endpoint. Uses an absolute URL so the `/api/v1`
   /// base path is not prepended.
   Future<HealthResponse> fetchHealth() async {
@@ -67,9 +120,15 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> _getJson(String path) async {
+  Future<Map<String, dynamic>> _getJson(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(path);
+      final response = await _dio.get<Map<String, dynamic>>(
+        path,
+        queryParameters: queryParameters,
+      );
       final data = response.data;
       if (data == null) {
         throw const ApiException(

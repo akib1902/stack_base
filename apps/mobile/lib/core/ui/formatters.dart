@@ -24,6 +24,18 @@ String formatDate(DateTime value) {
   return DateFormat.yMMMd().format(local);
 }
 
+/// Short, honest freshness label. A future timestamp is treated as "just now"
+/// rather than showing a negative age.
+String formatRelativeTime(DateTime value, {DateTime? now}) {
+  final current = (now ?? DateTime.now()).toUtc();
+  final difference = current.difference(value.toUtc());
+  if (difference.inSeconds < 45) return 'just now';
+  if (difference.inMinutes < 60) return '${difference.inMinutes} min ago';
+  if (difference.inHours < 24) return '${difference.inHours} h ago';
+  if (difference.inDays < 7) return '${difference.inDays} d ago';
+  return formatDate(value);
+}
+
 String initialsFor(String? displayName, String? email) {
   final source = (displayName ?? email ?? '').trim();
   if (source.isEmpty) return '?';
