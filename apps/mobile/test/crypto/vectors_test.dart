@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sodium/sodium_sumo.dart' show CryptoPwhashAlgorithm;
@@ -185,9 +186,11 @@ void main() {
     test('pins the committed bytes', () {
       final file = fileVector();
       final plain = fromBase64(file['plaintextBase64'] as String);
-      expect(toHex(fromBase64(file['ciphertextBase64'] as String)),
-          file['ciphertextSha256']);
-      expect(toHex(plain), file['plaintextSha256']);
+      expect(
+        sha256.convert(fromBase64(file['ciphertextBase64'] as String)).toString(),
+        file['ciphertextSha256'],
+      );
+      expect(sha256.convert(plain).toString(), file['plaintextSha256']);
       expect(
         toBase64(ciphertext().sublist(0, 24)),
         file['streamHeaderBase64'],

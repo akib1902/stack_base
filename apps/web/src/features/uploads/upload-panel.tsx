@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { UploadCloud } from 'lucide-react';
 import { useUploads } from './upload-context';
 import { UploadQueueList } from './upload-queue';
@@ -12,7 +13,9 @@ import { UploadQueueList } from './upload-queue';
  */
 export function UploadPanel() {
   const uploads = useUploads();
-  if (uploads.items.length === 0) return null;
+  const pathname = usePathname();
+  // The dedicated page already renders the same queue; do not duplicate it.
+  if (pathname === '/uploads' || uploads.items.length === 0) return null;
 
   const active = uploads.activeCount;
   const finished = uploads.items.length - active;

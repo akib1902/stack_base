@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/tokens.dart';
+import '../../../features/uploads/presentation/transfer_controller.dart';
 import '../../../features/uploads/presentation/transfers_sheet.dart';
 
 class StackBaseAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -46,10 +48,21 @@ class StackBaseAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         if (showTransfers)
-          IconButton(
-            onPressed: () => showTransfersSheet(context),
-            tooltip: 'Transfers',
-            icon: const Icon(Icons.swap_vert_rounded),
+          Consumer(
+            builder: (context, ref, _) {
+              final active =
+                  ref.watch(transferControllerProvider).value?.activeCount ?? 0;
+              final icon = const Icon(Icons.swap_vert_rounded);
+              return IconButton(
+                onPressed: () => showTransfersSheet(context),
+                tooltip: active == 0
+                    ? 'Transfers'
+                    : '$active active transfers',
+                icon: active == 0
+                    ? icon
+                    : Badge.count(count: active, child: icon),
+              );
+            },
           ),
         ...actions,
         const SizedBox(width: Space.x2),

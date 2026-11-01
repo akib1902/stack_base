@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +11,9 @@ import '../../../core/ui/components/offline_banner.dart';
 import '../../../core/ui/components/section_header.dart';
 import '../../../core/ui/components/stackbase_app_bar.dart';
 import '../../../core/ui/components/state_message.dart';
+import '../../encryption/presentation/vault_unlock.dart';
+import '../../uploads/presentation/transfer_controller.dart';
+import '../../uploads/presentation/transfers_sheet.dart';
 import '../domain/cloud_query.dart';
 import 'cloud_controller.dart';
 import 'widgets/cloud_sheets.dart';
@@ -57,6 +61,11 @@ class _CloudScreenState extends ConsumerState<CloudScreen> {
                 _searchOpen ? Icons.search_off_rounded : Icons.search_rounded,
               ),
             ),
+          IconButton(
+            onPressed: _upload,
+            tooltip: 'Upload an encrypted file',
+            icon: const Icon(Icons.upload_file_rounded),
+          ),
           IconButton(
             onPressed: () => showInsightsSheet(context),
             tooltip: 'Storage insights',
@@ -222,6 +231,31 @@ class _CloudScreenState extends ConsumerState<CloudScreen> {
     );
   }
 
+  Future<void> _upload() async {
+    final file = await openFile();
+    if (file == null || !mounted) return;
+    final unlocked = await ensureVaultUnlocked(context, ref);
+    if (!unlocked || !mounted) return;
+    final folderId = ref.read(cloudLibraryProvider).value?.query.folderId;
+    try {
+      await ref
+          .read(transferControllerProvider.notifier)
+          .enqueue(file, folderId: folderId);
+      if (!mounted) return;
+      await showTransfersSheet(context);
+    } on TransferException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The selected file could not be queued.')),
+      );
+    }
+  }
+
   void _toggleSearch() {
     setState(() => _searchOpen = !_searchOpen);
     if (!_searchOpen) {
@@ -334,9 +368,8 @@ class _EmptyFiles extends StatelessWidget {
         icon: Icons.cloud_upload_outlined,
         title: 'Your cloud library is empty',
         message:
-            'Files you upload on the web appear here after a refresh. '
-            'Uploading from this app arrives with the encrypted transfer '
-            'milestone; nothing is invented to fill the space.',
+            'Files you upload on the web or from this app appear here after a '
+            'refresh. Nothing is invented to fill the space.',
         actionLabel: 'Refresh',
         onAction: onRefresh,
       );

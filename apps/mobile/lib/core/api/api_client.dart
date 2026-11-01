@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../models/ciphertext_download.dart';
 import '../models/library.dart';
+import '../models/transfers.dart';
 import '../models/me_response.dart';
 import '../models/setup_status.dart';
 import '../models/user_settings.dart';
@@ -96,6 +100,167 @@ class ApiClient {
   Future<StorageInsightsResponse> fetchInsights() async {
     final data = await _getJson('insights');
     return _parse(data, StorageInsightsResponse.fromJson);
+  }
+
+  // -------------------------------------------------------------------------
+  // Encrypted uploads and immutable versions
+  // -------------------------------------------------------------------------
+
+  Future<CreateUploadResponse> createUpload(CreateUploadRequest request) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'uploads',
+        data: request.toJson(),
+        options: Options(contentType: Headers.jsonContentType),
+      );
+      return _parse<CreateUploadResponse>(
+        response.data,
+        CreateUploadResponse.fromJson,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// Sends exactly one ciphertext chunk. The 24-byte stream header is already
+  /// part of the staged file but is never sent as a chunk.
+  Future<UploadJob> putUploadChunk({
+    required String uploadId,
+    required int chunkNumber,
+    required Uint8List data,
+    required String checksum,
+  }) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        'uploads/${Uri.encodeComponent(uploadId)}/chunks/$chunkNumber',
+        data: data,
+        options: Options(
+          contentType: 'application/octet-stream',
+          headers: {'x-chunk-checksum': checksum},
+        ),
+      );
+      return _parse<UploadChunkResponse>(
+        response.data,
+        UploadChunkResponse.fromJson,
+      ).upload;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<FinalizeUploadResponse> finalizeUpload({
+    required String uploadId,
+    required String ciphertextHash,
+    required String plaintextFingerprint,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'uploads/${Uri.encodeComponent(uploadId)}/finalize',
+        data: {
+          'ciphertextHash': ciphertextHash,
+          'plaintextFingerprint': plaintextFingerprint,
+        },
+        options: Options(contentType: Headers.jsonContentType),
+      );
+      return _parse<FinalizeUploadResponse>(
+        response.data,
+        FinalizeUploadResponse.fromJson,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<UploadListResponse> listUploads() async {
+    final data = await _getJson('uploads');
+    return _parse(data, UploadListResponse.fromJson);
+  }
+
+  Future<UploadJob> pauseUpload(String uploadId) =>
+      _uploadAction(uploadId, 'pause');
+
+  Future<UploadJob> resumeUpload(String uploadId) =>
+      _uploadAction(uploadId, 'resume');
+
+  Future<UploadJob> retryUpload(String uploadId) =>
+      _uploadAction(uploadId, 'retry');
+
+  Future<UploadJob> cancelUpload(String uploadId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'uploads/${Uri.encodeComponent(uploadId)}/cancel',
+        options: Options(contentType: Headers.jsonContentType),
+      );
+      return _parse<UploadJob>(response.data, (json) {
+        final upload = json['upload'];
+        if (upload is! Map) {
+          throw const FormatException('Cancel response has no upload.');
+        }
+        return UploadJob.fromJson(Map<String, dynamic>.from(upload));
+      });
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<UploadJob> _uploadAction(String uploadId, String action) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        'uploads/${Uri.encodeComponent(uploadId)}/$action',
+        options: Options(contentType: Headers.jsonContentType),
+      );
+      return _parse<UploadJob>(response.data, (json) {
+        final upload = json['upload'];
+        if (upload is! Map) {
+          throw const FormatException('Upload action response has no upload.');
+        }
+        return UploadJob.fromJson(Map<String, dynamic>.from(upload));
+      });
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<FileVersionListResponse> fetchVersions(String fileId) async {
+    final data = await _getJson(
+      'files/${Uri.encodeComponent(fileId)}/versions',
+    );
+    return _parse(data, FileVersionListResponse.fromJson);
+  }
+
+  /// Opens the authenticated ciphertext stream. The caller writes it to a
+  /// private temp file, verifies the declared length/hash, then decrypts.
+  Future<CiphertextDownload> downloadVersion({
+    required String fileId,
+    required String versionId,
+  }) async {
+    try {
+      final response = await _dio.get<ResponseBody>(
+        'files/${Uri.encodeComponent(fileId)}/versions/'
+        '${Uri.encodeComponent(versionId)}/download',
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {'accept': 'application/octet-stream'},
+          extra: const {'noRetry': true},
+        ),
+      );
+      final body = response.data;
+      if (body == null) {
+        throw const ApiException(
+          code: 'INTERNAL_ERROR',
+          message: 'The server returned an empty download.',
+        );
+      }
+      final headers = response.headers.map;
+      return CiphertextDownload(
+        stream: body.stream,
+        contentLength: body.contentLength,
+        ciphertextHash: headers['x-stackbase-ciphertext-hash']?.first,
+        formatVersion: headers['x-stackbase-format']?.first,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
 
   /// The account's vault record, or null when no vault has been created yet.

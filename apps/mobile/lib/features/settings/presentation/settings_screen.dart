@@ -882,8 +882,9 @@ class _AboutCard extends StatelessWidget {
           ),
           const SizedBox(height: Space.x2),
           Text(
-            'Client-side encryption is not enabled in this build. No file '
-            'content or key material is sent to the API.',
+            'Files are encrypted on this device before upload. The API only '
+            'receives ciphertext, and the vault key stays in memory for the '
+            'session.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.mutedForeground,
             ),

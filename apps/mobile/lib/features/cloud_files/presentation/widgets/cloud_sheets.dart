@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../app/theme/tokens.dart';
 import '../../../../core/api/api_exception.dart';
@@ -9,6 +10,9 @@ import '../../../../core/ui/components/section_header.dart';
 import '../../../../core/ui/components/state_message.dart';
 import '../../../../core/ui/components/status_pill.dart';
 import '../../../../core/ui/formatters.dart';
+import '../../../encryption/presentation/vault_controller.dart';
+import '../../../encryption/presentation/vault_unlock.dart';
+import '../../../uploads/data/download_service.dart';
 import '../cloud_controller.dart';
 import 'cloud_summary.dart';
 
@@ -25,13 +29,69 @@ Future<void> showFileDetailsSheet(
   );
 }
 
-class _FileDetailsSheet extends StatelessWidget {
+class _FileDetailsSheet extends ConsumerStatefulWidget {
   const _FileDetailsSheet({required this.file});
 
   final FileSummary file;
 
   @override
+  ConsumerState<_FileDetailsSheet> createState() => _FileDetailsSheetState();
+}
+
+class _FileDetailsSheetState extends ConsumerState<_FileDetailsSheet> {
+  bool _busy = false;
+  String? _error;
+  DownloadedFile? _downloaded;
+
+  Future<void> _download() async {
+    final unlocked = await ensureVaultUnlocked(context, ref);
+    if (!unlocked || !mounted) return;
+    final key = ref.read(vaultControllerProvider.notifier).vaultKey;
+    if (key == null) {
+      setState(() => _error = 'The vault key is not available on this device.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _downloaded = null;
+    });
+    try {
+      final result = await ref
+          .read(downloadServiceProvider)
+          .download(file: widget.file, vaultKey: key);
+      if (!mounted) return;
+      setState(() => _downloaded = result);
+    } on DownloadException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.message);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error.userMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _error = 'The file could not be downloaded or decrypted.',
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _share() async {
+    final result = _downloaded;
+    if (result == null) return;
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(result.path)],
+        text: 'Decrypted locally by StackBase. The server only stored ciphertext.',
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final file = widget.file;
     final colors = context.stackColors;
     final tags = file.tags;
     final ready = file.contentStatus == FileContentStatus.ready;
@@ -155,35 +215,115 @@ class _FileDetailsSheet extends StatelessWidget {
                       ],
                     ),
                   const SizedBox(height: Space.x5),
-                  Container(
-                    padding: const EdgeInsets.all(Space.x3),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceRaised,
-                      borderRadius: BorderRadius.circular(Radii.control),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.lock_outline_rounded,
-                          size: 18,
-                          color: colors.mutedForeground,
+                  if (ready) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _busy ? null : _download,
+                        icon: _busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.download_rounded, size: 18),
+                        label: Text(
+                          _busy ? 'Downloading and decrypting…' : 'Download & decrypt',
                         ),
-                        const SizedBox(width: Space.x2),
-                        Expanded(
-                          child: Text(
-                            'Preview and download arrive with the cryptography '
-                            'and transfer milestones. This build shows metadata '
-                            'only and never decrypts content or asks for a '
-                            'passphrase.',
+                      ),
+                    ),
+                    const SizedBox(height: Space.x2),
+                    Text(
+                      'The server sends ciphertext only. This device verifies '
+                      'the length, SHA-256 and every secretstream tag before it '
+                      'writes a decrypted copy.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ] else
+                    Container(
+                      padding: const EdgeInsets.all(Space.x3),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceRaised,
+                        borderRadius: BorderRadius.circular(Radii.control),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.lock_clock_outlined,
+                            size: 18,
+                            color: colors.mutedForeground,
+                          ),
+                          const SizedBox(width: Space.x2),
+                          Expanded(
+                            child: Text(
+                              'This file has no finalized encrypted version yet. '
+                              'Upload it again before downloading.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: colors.mutedForeground),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_error != null) ...[
+                    const SizedBox(height: Space.x2),
+                    Text(
+                      _error!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.error,
+                      ),
+                    ),
+                  ],
+                  if (_downloaded != null) ...[
+                    const SizedBox(height: Space.x3),
+                    Container(
+                      padding: const EdgeInsets.all(Space.x3),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceRaised,
+                        borderRadius: BorderRadius.circular(Radii.control),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 18,
+                                color: colors.success,
+                              ),
+                              const SizedBox(width: Space.x2),
+                              Expanded(
+                                child: Text(
+                                  'Decrypted copy saved',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: Space.x1),
+                          Text(
+                            '${_downloaded!.name} · '
+                            '${formatBytes(_downloaded!.sizeBytes)} · '
+                            'version ${_downloaded!.versionNumber}',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: colors.mutedForeground),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: Space.x2),
+                          OutlinedButton.icon(
+                            onPressed: _share,
+                            icon: const Icon(Icons.ios_share_rounded, size: 18),
+                            label: const Text('Share or export'),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

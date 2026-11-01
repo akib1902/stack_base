@@ -361,8 +361,8 @@ class _LibraryCard extends StatelessWidget {
               if (library.files == 0) ...[
                 const SizedBox(height: Space.x2),
                 Text(
-                  'Your library is empty. Uploads are enabled in a later '
-                  'milestone; nothing is hidden here.',
+                  'Your library is empty. Upload an encrypted file from Local '
+                  'or Cloud; nothing is hidden here.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colors.mutedForeground,
                   ),
