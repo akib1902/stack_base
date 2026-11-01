@@ -24,7 +24,7 @@ export function Sidebar({ email }: { email: string | null }) {
       <div className="mt-auto border-t border-border px-5 py-4">
         <p className="truncate text-xs font-medium">{email ?? 'Signed in'}</p>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          Metadata build — encrypted uploads arrive in the next milestone.
+          Client-side encryption — only ciphertext leaves this device.
         </p>
       </div>
     </aside>

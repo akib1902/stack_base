@@ -34,7 +34,7 @@ const PRIMARY_NAV: NavItem[] = [
 
 const SECONDARY_NAV: NavItem[] = [
   { href: '/insights', label: 'Storage insights', icon: BarChart3, available: true },
-  { href: '/uploads', label: 'Uploads', icon: Upload, available: false },
+  { href: '/uploads', label: 'Uploads', icon: Upload, available: true },
   { href: '/settings', label: 'Settings', icon: Settings, available: true },
 ];
 

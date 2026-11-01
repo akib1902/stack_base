@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { EncryptionManifest, VaultRecord } from '@stackbase/contracts';
 import { describe, expect, it } from 'vitest';
 import { fromBase64, toBase64, toHex, utf8ToBytes } from '../src/lib/crypto/encoding';
@@ -62,6 +64,43 @@ async function decryptAll(
 }
 
 describe('vault vector (stackbase/1)', () => {
+  it('matches the shared JSON vectors used by the Flutter client', () => {
+    const shared = JSON.parse(
+      readFileSync(resolve(process.cwd(), '../mobile/assets/vectors/stackbase-1.json'), 'utf8'),
+    ) as {
+      vault: {
+        passphrase: string;
+        kdf: unknown;
+        kekHex: string;
+        vaultKeyHex: string;
+        wrappedVaultKey: unknown;
+        recoveryVerifier: unknown;
+      };
+      file: {
+        dataKeyHex: string;
+        plaintextBase64: string;
+        plaintextSha256: string;
+        ciphertextBase64: string;
+        ciphertextSha256: string;
+        manifest: unknown;
+      };
+    };
+
+    expect(shared.vault.passphrase).toBe(VAULT_VECTOR.passphrase);
+    expect(shared.vault.kdf).toEqual(VAULT_VECTOR.kdf);
+    expect(shared.vault.kekHex).toBe(VAULT_VECTOR.kekHex);
+    expect(shared.vault.vaultKeyHex).toBe(VAULT_VECTOR.vaultKeyHex);
+    expect(shared.vault.wrappedVaultKey).toEqual(VAULT_VECTOR.wrappedVaultKey);
+    expect(shared.vault.recoveryVerifier).toEqual(VAULT_VECTOR.recoveryVerifier);
+
+    expect(shared.file.dataKeyHex).toBe(FILE_VECTOR.dataKeyHex);
+    expect(shared.file.plaintextBase64).toBe(FILE_VECTOR.plaintextBase64);
+    expect(shared.file.plaintextSha256).toBe(FILE_VECTOR.plaintextSha256);
+    expect(shared.file.ciphertextBase64).toBe(FILE_VECTOR.ciphertextBase64);
+    expect(shared.file.ciphertextSha256).toBe(FILE_VECTOR.ciphertextSha256);
+    expect(shared.file.manifest).toEqual(FILE_VECTOR.manifest);
+  });
+
   it('unlocks to the pinned vault key', async () => {
     const vaultKey = await unlockVault(VAULT_VECTOR.record as VaultRecord, VAULT_VECTOR.passphrase);
     expect(toHex(vaultKey)).toBe(VAULT_VECTOR.vaultKeyHex);

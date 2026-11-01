@@ -79,6 +79,10 @@ interface QueuedUpload {
 
 export interface UploadContextValue {
   items: readonly UploadItem[];
+  /** True until the durable server queue has been read once. */
+  restoring: boolean;
+  /** The server queue could not be read; new uploads still work. */
+  restoreError: boolean;
   activeCount: number;
   enqueue(files: readonly File[], folderId: string | null): void;
   cancel(itemId: string): void;
@@ -146,6 +150,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const vault = useVault();
   const [items, setItems] = useState<UploadItem[]>([]);
+  const [restoring, setRestoring] = useState(true);
+  const [restoreError, setRestoreError] = useState(false);
 
   const queue = useRef<QueuedUpload[]>([]);
   const running = useRef(false);
@@ -552,6 +558,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         // Offline now: the rows stay on the server and appear on the next load.
+        if (!cancelled) setRestoreError(true);
+      } finally {
+        if (!cancelled) setRestoring(false);
       }
     })();
     return () => {
@@ -562,6 +571,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const value = useMemo<UploadContextValue>(
     () => ({
       items,
+      restoring,
+      restoreError,
       activeCount: items.filter((item) => !isFinished(item.status)).length,
       enqueue,
       cancel,
@@ -572,7 +583,19 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       dismiss,
       clearFinished,
     }),
-    [cancel, clearFinished, dismiss, enqueue, items, pause, reselect, resume, retry],
+    [
+      cancel,
+      clearFinished,
+      dismiss,
+      enqueue,
+      items,
+      pause,
+      reselect,
+      restoreError,
+      restoring,
+      resume,
+      retry,
+    ],
   );
 
   return <UploadContext.Provider value={value}>{children}</UploadContext.Provider>;
