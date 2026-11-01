@@ -1,6 +1,6 @@
 # StackBase mobile milestone plan
 
-**Status:** Mobile Milestone 2 complete · **Date:** 31 October 2026
+**Status:** Mobile Milestone 3 complete; Milestone 4 implementation complete with partial verification · **Date:** 1 November 2026
 
 This plan follows the instruction's rule: work in milestones, do not rewrite the web app,
 do not break API contracts, and report files, features, tests, limitations, security,
@@ -139,7 +139,9 @@ G1 optional; no writes yet.
 
 ---
 
-### Mobile Milestone 3 — `stackbase/1` crypto core and cross-platform interop
+### Mobile Milestone 3 — `stackbase/1` crypto core and cross-platform interop ✅
+
+**Status:** complete on Android/Dart on 1 November 2026 — [report](../reports/mobile-milestone-3.md).
 
 **Goal:** prove the mobile crypto implementation is the same format, not a lookalike.
 
@@ -176,6 +178,11 @@ API change.
 ---
 
 ### Mobile Milestone 4 — Encrypted upload/download and durable queue
+
+**Status:** implementation complete; verification partial on 1 November 2026. The real-API
+multi-chunk upload/finalize/download/decrypt round-trip passed. Process-kill resume, the
+full queue state machine, integrity-failure handling and foreground service are not yet
+demonstrated — [report](../reports/mobile-milestone-4.md).
 
 **Goal:** the real end-to-end pipeline, including a process-kill resume.
 
@@ -430,9 +437,9 @@ was not verified.
 | M0 — integration audit | **Complete** | [Mobile Milestone 0 report](../reports/mobile-milestone-0.md) |
 | M1 — foundation/auth | **Complete** | [Mobile Milestone 1 report](../reports/mobile-milestone-1.md) |
 | M2 — cloud read-only | **Complete** | [Mobile Milestone 2 report](../reports/mobile-milestone-2.md) |
-| M3 — crypto core | Not started | Depends on M1 and native build |
-| M4 — upload/download | Not started | Depends on M2 + M3 |
+| M3 — crypto core | **Complete** | [Mobile Milestone 3 report](../reports/mobile-milestone-3.md): 20 Android vector tests, both interop directions |
+| M4 — upload/download | **Implementation complete; verification partial** | [Mobile Milestone 4 report](../reports/mobile-milestone-4.md): real API round-trip passed; cold-start resume, queue UI and FGS pending |
 | M5 — cloud operations | Not started | Depends on M4 |
-| M6 — local files | Not started | Depends on M1/M2 |
+| M6 — local files | Not started | App-managed `Documents/StackBase` list exists; SAF/MediaStore/bookmarks pending |
 | M7 — offline sync | Not started | Depends on G3/G4 |
 | M8 — release hardening | Not started | Depends on all |

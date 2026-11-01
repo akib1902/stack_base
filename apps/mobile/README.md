@@ -4,8 +4,12 @@ Android and iOS client for the existing StackBase backend. The Fastify API,
 PostgreSQL schema, Supabase Auth integration and `stackbase/1` encryption format
 remain authoritative; this app is a first-party client, not a second product.
 
-**Status:** Mobile Milestone 1 — foundation, shell and authentication. See
-[Mobile Milestone 1 report](../../docs/reports/mobile-milestone-1.md) and the
+**Status:** core client implemented — foundation/auth, cloud read cache,
+`stackbase/1` crypto, encrypted upload/download, a durable local transfer queue and
+an app-managed local file list. Milestones 5–8 (cloud mutations/shares, full SAF
+file management, offline sync and release hardening) remain open. See
+[Mobile Milestone 3](../../docs/reports/mobile-milestone-3.md),
+[Mobile Milestone 4](../../docs/reports/mobile-milestone-4.md) and the
 [milestone plan](../../docs/mobile/milestone-plan.md).
 
 ## Requirements
@@ -14,8 +18,10 @@ remain authoritative; this app is a first-party client, not a second product.
 - JDK **17–21** for the Android Gradle build. JDK 26 currently fails in the
   Android Gradle Plugin `jlink` transform.
 - Android SDK platform 36, build-tools 36, `minSdk 24`
-- macOS with Xcode 27 for iOS builds (the iOS project is configured for
-  deployment target 15.0 and the UIScene lifecycle)
+- The Android NDK and `make` for the `sodium` native build
+- macOS with Xcode 27 for iOS builds (deployment target 15.0, UIScene lifecycle)
+- A Windows C++ toolchain (Visual Studio with `vswhere`) if you want to run the
+  Dart VM tests locally; otherwise run the integration suite on Android.
 
 The repository does not commit the SDK. A local Flutter checkout can live under
 `.toolchain/`, which is ignored.
@@ -56,9 +62,24 @@ secret in the app.
 flutter analyze
 flutter test
 
-# Optional: real API smoke test. Start the API first with AUTH_MODE=dev.
+# Optional: real API read smoke test. Start the API with AUTH_MODE=dev.
 flutter test test/integration/live_api_test.dart \
   --dart-define=LIVE_API_BASE_URL=http://127.0.0.1:8787
+
+# Optional: real API encrypted upload/download round-trip on Android.
+flutter test integration_test/upload_api_test.dart -d emulator-5554 \
+  --dart-define=API_BASE_URL=http://10.0.2.2:8787
+
+# Android crypto vectors + web interop fixture.
+flutter test \
+  integration_test/crypto_vectors_test.dart \
+  integration_test/interop_fixture_test.dart \
+  -d emulator-5554 --no-uninstall
+
+# Pull the Flutter→web fixture, then verify it with the web libsodium build.
+adb exec-out run-as app.stackbase.mobile \
+  cat files/interop-flutter-to-web.json > .tmp-flutter-interop.json
+node tool/interop/verify_flutter_fixture.mjs .tmp-flutter-interop.json
 
 # Android debug APK
 flutter build apk --debug \
@@ -66,8 +87,9 @@ flutter build apk --debug \
   --dart-define=AUTH_MODE=dev
 ```
 
-The live API test creates a fresh development identity in the local database and
-is skipped unless `LIVE_API_BASE_URL` is defined.
+The host `flutter test` command needs Visual Studio/MSVC for the `sodium` build
+hook. On this Windows host the native tests are run on Android instead; the test
+files are shared.
 
 ## Code generation
 
@@ -84,40 +106,45 @@ dart run build_runner build
 lib/
 ├── app/            # MaterialApp, router, Amber/Graphite themes
 ├── core/
-│   ├── api/        # Dio, auth/retry interceptors, error mapping
+│   ├── api/        # Dio, auth/retry, upload/version transport
 │   ├── auth/       # dev + Supabase repositories, secure storage, controller
 │   ├── config/     # validated --dart-define configuration
+│   ├── crypto/     # stackbase/1 vault, file format, share capability
+│   ├── database/   # per-account metadata cache
 │   ├── models/     # contract DTOs
-│   ├── ui/         # shared cards, states, app bar, formatters
-│   └── providers.dart
-├── features/
-│   ├── auth/       # sign-in
-│   ├── home/       # real account, library, storage, vault and health states
-│   ├── local_files/
-│   ├── cloud_files/
-│   ├── settings/   # account, theme sync, server status, sign-out
-│   ├── shell/      # bottom navigation / navigation rail
-│   └── uploads/    # transfer affordance and honest empty state
-└── main.dart
+│   └── ui/         # shared cards, states, app bar, formatters
+└── features/
+    ├── auth/
+    ├── home/
+    ├── local_files/ # app-managed Documents/StackBase list, upload/share/delete
+    ├── cloud_files/ # cached read browser, upload action, download/decrypt
+    ├── encryption/  # vault controller and shared unlock prompt
+    ├── settings/
+    ├── shell/
+    └── uploads/     # transfer controller, staging, download, queue sheet
 ```
 
 ## Security model
 
-- Access tokens and development sessions are stored with
-  `flutter_secure_storage` (Android Keystore, iOS Keychain
-  `first_unlock_this_device`); no session token is kept in shared preferences.
-- Every account-scoped secure key uses `stackbase.account.<userId>.` so a second
-  account cannot read the first account's material. Sign-out removes the
-  session and the departing account's keys.
-- The dev-session route is only constructed in debug builds and the API rejects
-  it outside `AUTH_MODE=dev`.
+- Access tokens and development sessions use `flutter_secure_storage` (Android
+  Keystore, iOS Keychain). No session token is kept in shared preferences.
+- Every account-scoped secure key uses `stackbase.account.<userId>.`; sign-out
+  removes the session and the departing account's keys and closes its cache.
+- The dev-session route is only constructed in debug builds and the API rejects it
+  outside `AUTH_MODE=dev`.
 - Android backups are disabled; release builds do not permit cleartext HTTP.
-  Debug builds allow cleartext only for a local API.
-- File encryption, vault keys and uploads are **not** part of this milestone.
-  No plaintext or key material is sent to the API by this build.
+- Vault passphrases and vault keys are never persisted, logged or sent to the API.
+  The vault key is held in memory for the session and zeroized on lock/sign-out.
+- Uploads stage ciphertext only. Downloads verify length, both SHA-256 values and
+  every secretstream tag before writing plaintext.
+- The Local tab only lists files StackBase created under its own Documents
+  directory; it does not request device-wide storage access.
 
-## Not implemented yet
+## Current limits
 
-Cloud browsing, local device browsing, `stackbase/1` crypto, encrypted
-transfers, offline cache and share links are later milestones. The corresponding
-screens say so instead of showing fabricated data or actions.
+- Cloud rename/move/tag/favourite/trash, shares, version restore and previews are
+  Mobile Milestone 5.
+- Android SAF/MediaStore browsing and iOS security-scoped bookmarks are Milestone 6.
+- Offline metadata mutations require API gaps G3/G4 and are Milestone 7.
+- Android foreground-service uploads, iOS background behavior, accessibility and
+  release signing are Milestone 8.

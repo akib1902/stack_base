@@ -359,6 +359,27 @@ void main() {
       }
     });
 
+    test('round-trips the default 1 MiB chunk loop', () async {
+      final plaintext = Uint8List.fromList(
+        List<int>.generate(
+          2 * 1024 * 1024 + 17,
+          (index) => (index * 19 + 9) & 0xff,
+        ),
+      );
+      final encrypted = await fileCrypto.encryptBytes(
+        plaintext: plaintext,
+        vaultKey: key,
+      );
+      expect(encrypted.manifest.chunking.plaintextChunkSize, 1024 * 1024);
+      expect(encrypted.manifest.chunking.totalChunks, 3);
+      final decrypted = await fileCrypto.decryptBytes(
+        manifest: encrypted.manifest,
+        vaultKey: key,
+        ciphertext: encrypted.ciphertext,
+      );
+      expect(decrypted, plaintext);
+    });
+
     test('rejects reordered, dropped and corrupted chunks', () async {
       final plaintext = Uint8List.fromList(
         List<int>.generate(2 * chunkSize + 7, (index) => index & 0xff),
