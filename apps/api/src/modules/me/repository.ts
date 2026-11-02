@@ -15,6 +15,7 @@ interface ProfileRow {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  isAdmin: boolean;
   createdAt: unknown;
   theme: 'amber' | 'graphite' | null;
   defaultView: 'grid' | 'list' | null;
@@ -54,6 +55,7 @@ const SELECT_PROFILE = `
     u.email,
     p.display_name as "displayName",
     p.avatar_url as "avatarUrl",
+    p.is_admin as "isAdmin",
     p.created_at as "createdAt",
     s.theme,
     s.default_view as "defaultView",
@@ -76,9 +78,15 @@ export async function getMe(db: Db, user: AuthenticatedUser): Promise<MeResponse
 
   if (first.rows.length === 0 || first.rows[0]?.theme === null) {
     await db.transaction(async (tx) => {
+      // Keep first-account bootstrap consistent with the auth trigger when an
+      // identity predates the profile trigger.
+      await tx.query("select pg_advisory_xact_lock(hashtext('stackbase:first-admin'))");
+      const admin = await tx.query<{ hasAdmin: boolean }>(
+        'select exists (select 1 from public.profiles where is_admin) as "hasAdmin"',
+      );
       await tx.query(
-        'insert into public.profiles (id) values ($1) on conflict (id) do nothing',
-        [user.id],
+        'insert into public.profiles (id, is_admin) values ($1, $2) on conflict (id) do nothing',
+        [user.id, admin.rows[0]?.hasAdmin !== true],
       );
       await tx.query(
         'insert into public.user_settings (user_id) values ($1) on conflict (user_id) do nothing',
@@ -102,6 +110,7 @@ export async function getMe(db: Db, user: AuthenticatedUser): Promise<MeResponse
       avatarUrl: row.avatarUrl,
       createdAt: toIsoString(row.createdAt),
     },
+    isAdmin: row.isAdmin === true,
     settings: {
       theme: row.theme ?? 'amber',
       defaultView: row.defaultView ?? 'grid',

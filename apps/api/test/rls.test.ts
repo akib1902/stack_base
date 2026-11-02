@@ -87,6 +87,21 @@ afterAll(async () => {
 });
 
 describe('row-level security on user-owned tables', () => {
+  it('does not let an account promote itself to instance owner', async () => {
+    const error = await asUser(bob, () =>
+      ctx.db
+        .query('update public.profiles set is_admin = true where id = $1', [bob])
+        .catch((caught: unknown) => caught),
+    );
+    expect(errorCode(error)).toBe('42501');
+
+    const row = await ctx.db.query<{ isAdmin: boolean }>(
+      'select is_admin as "isAdmin" from public.profiles where id = $1',
+      [bob],
+    );
+    expect(row.rows[0]?.isAdmin).toBe(false);
+  });
+
   it('returns only the acting user’s rows', async () => {
     const rows = await asUser(alice, () =>
       ctx.db.query<{ id: string }>('select id from public.files'),

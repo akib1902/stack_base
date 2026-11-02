@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   SignJWT,
   createRemoteJWKSet,
@@ -43,6 +44,41 @@ function toAuthenticatedUser(payload: JWTPayload): AuthenticatedUser {
 }
 
 export type TokenVerifier = (token: string) => Promise<AuthenticatedUser>;
+
+/**
+ * Verifies against the current auth configuration and rebuilds the underlying
+ * verifier when an owner rotates the Supabase project or verification key. This
+ * keeps a long-lived API process from pinning credentials that were changed in
+ * the Deployment settings screen.
+ */
+export function createDynamicTokenVerifier(
+  getConfig: () => Config['auth'],
+): TokenVerifier {
+  let fingerprint = '';
+  let verifier: TokenVerifier | null = null;
+
+  return async (token) => {
+    const current = getConfig();
+    const nextFingerprint = createHash('sha256')
+      .update(
+        JSON.stringify({
+          mode: current.mode,
+          issuer: current.issuer,
+          audience: current.audience,
+          jwksUrl: current.mode === 'supabase' ? current.jwksUrl : null,
+          secret: current.mode === 'supabase' ? current.jwtSecret : current.secret,
+        }),
+      )
+      .digest('hex');
+
+    if (!verifier || fingerprint !== nextFingerprint) {
+      verifier = createTokenVerifier(current);
+      fingerprint = nextFingerprint;
+    }
+
+    return verifier(token);
+  };
+}
 
 export function createTokenVerifier(config: Config['auth']): TokenVerifier {
   const sharedSecret = new TextEncoder().encode(

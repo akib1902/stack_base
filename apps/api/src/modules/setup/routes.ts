@@ -6,7 +6,7 @@ import { getSetupStatus } from './repository';
 
 export function registerSetupRoutes(
   app: FastifyInstance,
-  deps: { db: Db; provider: StorageProvider },
+  deps: { db: Db; getProvider: () => StorageProvider },
 ): void {
   app.get(
     '/api/v1/setup/status',
@@ -19,7 +19,7 @@ export function registerSetupRoutes(
       if (!user) {
         throw authRequired();
       }
-      return getSetupStatus(deps.db, user.id, { provider: deps.provider });
+      return getSetupStatus(deps.db, user.id, { provider: deps.getProvider() });
     },
   );
 }

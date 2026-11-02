@@ -75,8 +75,8 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
-          Account, appearance and connection state. Nothing here needs a privileged credential,
-          and session material is never displayed.
+          Account, appearance and connection state. Owner-only deployment credentials live on a
+          separate page and are never returned to the browser.
         </p>
       </header>
 
@@ -142,6 +142,28 @@ export default async function SettingsPage() {
           <DetailRow label="Member since">{formatDateTime(me.user.createdAt)}</DetailRow>
         </dl>
       </Card>
+
+      {me.isAdmin ? (
+        <Card>
+          <CardHeading
+            icon={<ShieldCheck className="size-4" />}
+            title="Deployment integrations"
+            hint="Owner-only Supabase Auth and Telegram application settings"
+            action={
+              <Link
+                href="/settings/deployment"
+                className="text-xs font-medium text-primary-ink hover:underline"
+              >
+                Configure
+              </Link>
+            }
+          />
+          <p className="text-sm leading-relaxed text-muted">
+            Change the Supabase project verification material or Telegram MTProto application
+            credentials. Secrets are sealed at rest and can only be replaced, never read back.
+          </p>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeading

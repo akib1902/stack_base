@@ -33,6 +33,8 @@ export type UserSettingsUpdate = Static<typeof UserSettingsUpdateSchema>;
 export const MeResponseSchema = Type.Object({
   user: AuthUserSchema,
   settings: UserSettingsSchema,
+  /** True only for the instance owner; authorizes deployment configuration. */
+  isAdmin: Type.Boolean(),
 });
 export type MeResponse = Static<typeof MeResponseSchema>;
 

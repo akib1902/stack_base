@@ -217,6 +217,7 @@ function validRequest(
     },
     'POST /api/v1/storage/telegram/authorize': { phoneNumber: '+15551234567' },
     'POST /api/v1/storage/telegram/verify': {},
+    'PUT /api/v1/admin/deployment': { supabase: { url: null } },
   };
 
   if (key in bodies) return { url, payload: bodies[key] };

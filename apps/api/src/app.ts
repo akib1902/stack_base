@@ -4,9 +4,11 @@ import rateLimit from '@fastify/rate-limit';
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import { MAX_PLAINTEXT_CHUNK_SIZE, SECRETSTREAM_ABYTES } from '@stackbase/contracts';
 import type { Config } from './config/env';
-import { ApiError, authRequired } from './errors';
+import { ApiError, authRequired, forbidden } from './errors';
 import { isDatabaseUnavailable, type Db } from './database/db';
-import { createTokenVerifier, readBearerToken } from './security/token';
+import { createDynamicTokenVerifier, readBearerToken } from './security/token';
+import { registerDeploymentRoutes } from './modules/deployment/routes';
+import { loadDeploymentSettings } from './modules/deployment/repository';
 import { registerHealthRoutes } from './modules/health/routes';
 import { registerMeRoutes } from './modules/me/routes';
 import { registerSetupRoutes } from './modules/setup/routes';
@@ -59,7 +61,20 @@ export async function buildApp({
 
   app.decorateRequest('user', null);
 
-  const verifyToken = createTokenVerifier(config.auth);
+  // Owner-managed settings are applied before any route can observe them. A
+  // missing settings table is not fatal: deployments can still run from env.
+  try {
+    const loaded = await loadDeploymentSettings(db, config);
+    for (const warning of loaded.warnings) {
+      app.log.warn({ warning }, 'deployment settings');
+    }
+  } catch {
+    app.log.warn(
+      'Deployment settings could not be loaded; environment configuration is in use. Run migrations.',
+    );
+  }
+
+  const verifyToken = createDynamicTokenVerifier(() => config.auth);
 
   app.decorate('authenticate', async (request) => {
     const token = readBearerToken(request.headers.authorization);
@@ -84,6 +99,19 @@ export async function buildApp({
     }
 
     request.user = identity;
+  });
+
+  app.decorate('requireAdmin', async (request) => {
+    if (!request.user) {
+      throw authRequired();
+    }
+    const { rows } = await db.query<{ isAdmin: boolean }>(
+      'select is_admin as "isAdmin" from public.profiles where id = $1',
+      [request.user.id],
+    );
+    if (rows[0]?.isAdmin !== true) {
+      throw forbidden('Deployment settings are restricted to the instance owner.');
+    }
   });
 
   await app.register(cors, {
@@ -191,7 +219,8 @@ export async function buildApp({
 
   registerHealthRoutes(app, { db });
   registerMeRoutes(app, { db });
-  registerSetupRoutes(app, { db, provider: config.storage.provider });
+  registerSetupRoutes(app, { db, getProvider: () => config.storage.provider });
+  registerDeploymentRoutes(app, { db, config });
   registerLibraryRoutes(app, { db, config });
   registerEncryptionRoutes(app, { db });
   registerUploadRoutes(app, { db, config });

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { Type, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
+import { parseSettingsKey, type SettingsKey } from '../security/secret-box';
 
 /**
  * Raw environment schema. Values arrive as strings; the typed Config below
@@ -26,6 +27,8 @@ const RawEnvSchema = Type.Object({
   TELEGRAM_API_ID: Type.Optional(Type.String({ pattern: '^[0-9]{1,12}$' })),
   TELEGRAM_API_HASH: Type.Optional(Type.String({ minLength: 16, maxLength: 128 })),
   SESSION_ENCRYPTION_KEY: Type.Optional(Type.String({ minLength: 1 })),
+  /** Seals owner-managed deployment settings at rest (32 bytes, base64). */
+  SETTINGS_ENCRYPTION_KEY: Type.Optional(Type.String({ minLength: 1 })),
   MAX_UPLOAD_BYTES: Type.Optional(Type.String({ pattern: '^[0-9]{1,12}$' })),
   MAX_ACTIVE_UPLOADS: Type.Optional(Type.String({ pattern: '^[0-9]{1,3}$' })),
   STAGING_DIR: Type.Optional(Type.String({ minLength: 1 })),
@@ -58,6 +61,8 @@ export interface DatabaseConfig {
 export interface StorageConfig {
   /** `local` is development/test only and rejected in production (ADR-015). */
   provider: 'local' | 'telegram';
+  /** Immutable environment baseline; settings rows override the two fields below. */
+  environmentProvider: 'local' | 'telegram';
   maxUploadBytes: number;
   maxActiveUploads: number;
   /** Where ciphertext chunks are staged while uploading (ciphertext only). */
@@ -65,6 +70,7 @@ export interface StorageConfig {
   /** Filesystem root for the local development provider. */
   localObjectsDir: string;
   telegram: { apiId: number; apiHash: string } | null;
+  environmentTelegram: { apiId: number; apiHash: string } | null;
   /** AES-256-GCM key sealing MTProto session strings (ADR-016). */
   sessionKey: { key: Buffer; version: string } | null;
 }
@@ -77,8 +83,12 @@ export interface Config {
   webOrigin: string;
   logLevel: string;
   auth: AuthConfig;
+  /** Immutable environment baseline used when a saved override is cleared. */
+  authEnv: AuthConfig;
   database: DatabaseConfig;
   storage: StorageConfig;
+  /** Null disables writing/reading owner-managed secrets; env config still works. */
+  settingsKey: SettingsKey | null;
 }
 
 export class ConfigError extends Error {
@@ -118,6 +128,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
   const authMode = raw.AUTH_MODE ?? 'dev';
   const auth = buildAuthConfig(raw, authMode, nodeEnv, problems);
   const storage = buildStorageConfig(raw, nodeEnv, problems);
+  const settings = parseSettingsKey(raw.SETTINGS_ENCRYPTION_KEY);
+  if (settings.problem) {
+    problems.push(settings.problem);
+  }
 
   // PORT=0 means "any free port" to most tooling and cannot be advertised to the
   // web app, so it is treated as unset and the documented default is used.
@@ -138,8 +152,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): Config {
     webOrigin: raw.WEB_ORIGIN ?? 'http://localhost:3000',
     logLevel: raw.LOG_LEVEL ?? 'info',
     auth: auth as AuthConfig,
+    authEnv: auth as AuthConfig,
     database: loadDatabaseConfig(source),
     storage: storage as StorageConfig,
+    settingsKey: settings.key,
   };
 }
 
@@ -277,11 +293,13 @@ function buildStorageConfig(
 
   return {
     provider,
+    environmentProvider: provider,
     maxUploadBytes,
     maxActiveUploads,
     stagingDir: raw.STAGING_DIR ?? path.resolve(process.cwd(), '.data', 'staging'),
     localObjectsDir: raw.LOCAL_STORAGE_DIR ?? path.resolve(process.cwd(), '.data', 'objects'),
     telegram,
+    environmentTelegram: telegram,
     sessionKey,
   };
 }

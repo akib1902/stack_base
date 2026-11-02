@@ -9,5 +9,7 @@ declare module 'fastify' {
 
   interface FastifyInstance {
     authenticate: preHandlerHookHandler;
+    /** Refuses the request unless profiles.is_admin is true for the token subject. */
+    requireAdmin: preHandlerHookHandler;
   }
 }

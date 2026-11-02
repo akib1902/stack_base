@@ -9,6 +9,7 @@ import {
   Home,
   Settings,
   Share2,
+  ShieldCheck,
   Star,
   Trash2,
   Upload,
@@ -21,6 +22,7 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   available: boolean;
+  adminOnly?: boolean;
 }
 
 const PRIMARY_NAV: NavItem[] = [
@@ -35,6 +37,13 @@ const PRIMARY_NAV: NavItem[] = [
 const SECONDARY_NAV: NavItem[] = [
   { href: '/insights', label: 'Storage insights', icon: BarChart3, available: true },
   { href: '/uploads', label: 'Uploads', icon: Upload, available: true },
+  {
+    href: '/settings/deployment',
+    label: 'Deployment',
+    icon: ShieldCheck,
+    available: true,
+    adminOnly: true,
+  },
   { href: '/settings', label: 'Settings', icon: Settings, available: true },
 ];
 
@@ -78,8 +87,9 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
   );
 }
 
-export function NavLinks() {
+export function NavLinks({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const secondary = SECONDARY_NAV.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <nav aria-label="Primary" className="px-3 pb-4">
@@ -98,7 +108,7 @@ export function NavLinks() {
       </ul>
 
       <ul className="mt-4 space-y-0.5 border-t border-border pt-3">
-        {SECONDARY_NAV.map((item) => (
+        {secondary.map((item) => (
           <li key={item.label}>
             <NavRow
             item={item}

@@ -10,3 +10,4 @@ export * from './insights';
 export * from './shares';
 export * from './lifecycle';
 export * from './audit';
+export * from './deployment';

@@ -1,7 +1,7 @@
 import { HardDrive } from 'lucide-react';
 import { NavLinks } from './NavLinks';
 
-export function Sidebar({ email }: { email: string | null }) {
+export function Sidebar({ email, isAdmin }: { email: string | null; isAdmin: boolean }) {
   return (
     <aside className="sticky top-0 hidden h-dvh flex-col border-r border-border bg-surface lg:flex">
       <div className="flex items-center gap-3 px-5 pb-5 pt-5">
@@ -19,7 +19,7 @@ export function Sidebar({ email }: { email: string | null }) {
         </div>
       </div>
 
-      <NavLinks />
+      <NavLinks isAdmin={isAdmin} />
 
       <div className="mt-auto border-t border-border px-5 py-4">
         <p className="truncate text-xs font-medium">{email ?? 'Signed in'}</p>

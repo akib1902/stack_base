@@ -4,7 +4,15 @@ import { MobileNavigation } from './MobileNavigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-export function AppShell({ user, children }: { user: AuthUser; children: ReactNode }) {
+export function AppShell({
+  user,
+  isAdmin,
+  children,
+}: {
+  user: AuthUser;
+  isAdmin: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <a
@@ -13,7 +21,7 @@ export function AppShell({ user, children }: { user: AuthUser; children: ReactNo
       >
         Skip to content
       </a>
-      <Sidebar email={user.email} />
+      <Sidebar email={user.email} isAdmin={isAdmin} />
       <div className="flex min-h-dvh flex-col">
         <TopBar user={user} />
         <main

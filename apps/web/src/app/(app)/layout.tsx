@@ -30,7 +30,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <VaultProvider record={vault.vault}>
       <OfflineProvider user={me.user} offlineEnabled={me.settings.offlineEnabled}>
         <UploadProvider>
-          <AppShell user={me.user}>{children}</AppShell>
+          <AppShell user={me.user} isAdmin={me.isAdmin}>
+            {children}
+          </AppShell>
           <UploadPanel />
         </UploadProvider>
       </OfflineProvider>
