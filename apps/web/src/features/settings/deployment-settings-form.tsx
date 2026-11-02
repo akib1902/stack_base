@@ -55,6 +55,7 @@ function SecretState({
 export function DeploymentSettingsForm({ initial }: { initial: DeploymentSettingsResponse }) {
   const router = useRouter();
   const [settings, setSettings] = useState(initial);
+  const [baseline, setBaseline] = useState(initial);
   const [supabaseUrl, setSupabaseUrl] = useState(initial.auth.supabaseUrl ?? '');
   const [publishableKey, setPublishableKey] = useState('');
   const [jwtSecret, setJwtSecret] = useState('');
@@ -85,21 +86,33 @@ export function DeploymentSettingsForm({ initial }: { initial: DeploymentSetting
     setError(null);
     setNotice(null);
 
-    const supabase: SupabasePatch = {
-      url: supabaseUrl.trim() || null,
-      jwksUrl: jwksUrl.trim() || null,
-    };
+    const supabase: SupabasePatch = {};
+    const nextUrl = supabaseUrl.trim() || null;
+    if (nextUrl !== (baseline.auth.supabaseUrl?.trim() || null)) {
+      supabase.url = nextUrl;
+    }
+    const nextJwks = jwksUrl.trim() || null;
+    if (nextJwks !== (baseline.auth.jwksUrl?.trim() || null)) {
+      supabase.jwksUrl = nextJwks;
+    }
     if (publishableKey.trim()) supabase.publishableKey = publishableKey.trim();
     else if (clearPublishable) supabase.publishableKey = null;
     if (jwtSecret.trim()) supabase.jwtSecret = jwtSecret.trim();
     else if (clearJwt) supabase.jwtSecret = null;
 
-    const telegram: TelegramPatch = {
-      provider,
-      apiId: parsedApiId,
-    };
+    const telegram: TelegramPatch = {};
+    if (provider !== baseline.storage.provider) telegram.provider = provider;
+    if (parsedApiId !== (baseline.storage.telegramApiId ?? null)) {
+      telegram.apiId = parsedApiId;
+    }
     if (apiHash.trim()) telegram.apiHash = apiHash.trim();
     else if (clearApiHash) telegram.apiHash = null;
+
+    if (Object.keys(supabase).length === 0 && Object.keys(telegram).length === 0) {
+      setPending(false);
+      setError('Change a value before saving.');
+      return;
+    }
 
     try {
       const result = await sendJson<DeploymentSettingsResponse>('/api/deployment', {
@@ -107,6 +120,7 @@ export function DeploymentSettingsForm({ initial }: { initial: DeploymentSetting
         body: { supabase, telegram } satisfies DeploymentSettingsUpdate,
       });
       setSettings(result);
+      setBaseline(result);
       setSupabaseUrl(result.auth.supabaseUrl ?? '');
       setJwksUrl(result.auth.jwksUrl ?? '');
       setProvider(result.storage.provider);

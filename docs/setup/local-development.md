@@ -38,6 +38,7 @@ validated at startup; the process refuses to boot with a clear list of problems.
 | `STORAGE_PROVIDER` | `local` | `local` (filesystem, development only) or `telegram` |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | — | Required when `STORAGE_PROVIDER=telegram`; from <https://my.telegram.org> |
 | `SESSION_ENCRYPTION_KEY` | — | 32 bytes base64 (`openssl rand -base64 32`); seals the stored Telegram session |
+| `SETTINGS_ENCRYPTION_KEY` | — | 32 bytes base64 (`openssl rand -base64 32`); seals owner-managed Supabase/Telegram credentials. Optional: without it the Deployment form can read status but cannot save secrets |
 | `MAX_UPLOAD_BYTES` | `2147483648` | 2 GiB default; allowed 1 MiB–16 GiB, single-file upload cap |
 | `MAX_ACTIVE_UPLOADS` | `4` | Unfinished upload jobs allowed per user (1–32) |
 | `LOG_LEVEL` | `info` | Pino level; authorization headers are redacted |
@@ -71,6 +72,32 @@ cp apps/web/.env.example apps/web/.env.local
 
 `API_BASE_URL` is server-only. The browser never receives it, and never receives the
 access token: the token is kept in an httpOnly cookie and attached by the Next.js server.
+
+## 3a. Owner deployment integrations
+
+The first account created in a database becomes the single **owner**
+(`profiles.is_admin`). Sign in as that account and open **Settings → Deployment** (or
+**Deployment** in the sidebar). The page is not linked for ordinary accounts, answers
+`404` when opened directly, and the API returns `403 FORBIDDEN` if they call the endpoint.
+
+The owner can change:
+
+- Supabase project URL, publishable/anon key, legacy JWT secret and JWKS URL. These
+  verification values are used by the API when it runs with `AUTH_MODE=supabase`; the
+  publishable key is stored for client configuration and is never returned by the API.
+- Telegram API ID and API hash, and the active storage provider. Telegram changes apply to
+  the running API process immediately; other API processes need a restart.
+
+Saved secrets are sealed with `SETTINGS_ENCRYPTION_KEY` (AES-256-GCM), never returned in
+the page, API response or audit metadata, and never written to a log. The page is
+write-only for saved secrets: leave a field blank to keep it, or tick **Remove** to clear
+it. `DATABASE_URL`, `AUTH_MODE` and a Supabase `service_role` key are intentionally not
+accepted by the form. `SESSION_ENCRYPTION_KEY` is also environment-only because it opens
+every stored Telegram session.
+
+To rotate `SETTINGS_ENCRYPTION_KEY`, first clear/re-save the saved secrets under the old
+key, or accept that saved overrides become unreadable and the API falls back to the
+environment values. The key is not stored in the database.
 
 ## 4. Run
 
@@ -187,7 +214,7 @@ upload pipeline).
 ## Production checklist
 
 The items below were exercised from a clean clone against a throwaway configuration:
-`pnpm install --frozen-lockfile`, `pnpm db:migrate` (13 migrations from scratch),
+`pnpm install --frozen-lockfile`, `pnpm db:migrate` (14 migrations from scratch),
 `pnpm seed`, `pnpm build`, `pnpm test`, `pnpm db:reset`, and an API started with
 `NODE_ENV=production`, `AUTH_MODE=supabase` and `STORAGE_PROVIDER=telegram`. See the
 clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
@@ -218,9 +245,10 @@ clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
    allows that origin in CORS. Terminate TLS in front of both services and keep
    `API_BASE_URL` a server-side value in `apps/web/.env.local`.
 7. **Secrets stay out of the repository.** `apps/api/.env` holds `DEV_AUTH_SECRET`,
-   `SESSION_ENCRYPTION_KEY` and `SUPABASE_JWT_SECRET`; none of them may be committed, and
-   the session key must not change after a Telegram account is linked (it seals the
-   stored MTProto session).
+   `SESSION_ENCRYPTION_KEY`, `SETTINGS_ENCRYPTION_KEY` and `SUPABASE_JWT_SECRET`; none of
+   them may be committed, and the session key must not change after a Telegram account is
+   linked (it seals the stored MTProto session). The settings key seals the database-backed
+   overrides and must be backed up separately from the database.
 8. **Operator checks.** `pnpm storage:verify --email <address> --dry-run` re-hashes every
    stored object without changing anything (it reports “Verifying 0 stored object(s)” on
    a fresh database with no uploads).
@@ -242,3 +270,5 @@ clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
 | `db:reset` refuses to run | `DATABASE_URL` is set; drop and recreate that database deliberately instead |
 | Every request returns 401 “This session no longer matches an account in this deployment” | The token is signed correctly but its user is gone from `auth.users`; sign in again. Tokens are not revoked by Supabase when a user is deleted, so this check is what closes that window |
 | The web app has no way to sign in against Supabase | Not implemented yet: the sign-in screen only issues local development sessions. Use `AUTH_MODE=dev` |
+| Deployment settings return `SETTINGS_KEY_MISSING` | Add `SETTINGS_ENCRYPTION_KEY` (32 bytes base64) to `apps/api/.env` and restart. Public values can still be read without it |
+| Owner cannot see the Deployment page | Only the first account in the database is `profiles.is_admin`; check `select id, is_admin from public.profiles order by created_at` |

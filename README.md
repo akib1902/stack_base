@@ -17,8 +17,10 @@ The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 > manifest and service worker, and a queued offline-operation store with conflict
 > detection are implemented and tested. The responsive/accessibility pass covers
 > overflow, contrast, focus and touch targets on every screen, and a security sweep
-> driven by the real route table proves that all 47 authenticated endpoints reject
+> driven by the real route table proves that every authenticated endpoint rejects
 > anonymous callers and that one account cannot read or change another's data.
+> The owner-only Deployment settings screen can rotate Supabase Auth verification material and
+> Telegram MTProto application credentials; secrets are sealed at rest and never returned.
 > A clean-clone deployment check (install, migrate, seed, build, tests, and a
 > production-mode API verified against locally minted Supabase tokens) passes. The one
 > open blocker for release is the Supabase sign-in screen: the web app still signs in
@@ -46,6 +48,9 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 #   → paste the value into DEV_AUTH_SECRET
+# Optional, for saving deployment integrations from the owner UI:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+#   → paste the value into SETTINGS_ENCRYPTION_KEY
 
 # 2. Configure the web app
 cp apps/web/.env.example apps/web/.env.local
@@ -101,7 +106,7 @@ apps/
 packages/
   contracts/           TypeBox schemas shared by API and web
 supabase/
-  migrations/          0001–0012 schema, constraints, indexes, RLS, checks
+  migrations/          0001–0014 schema, constraints, indexes, RLS, checks
   local/               local-only auth stub (never apply to Supabase)
 docs/                  setup, architecture, decisions and milestone reports
 ```
@@ -129,6 +134,11 @@ docs/                  setup, architecture, decisions and milestone reports
 - **Telegram session material is never exposed** by any endpoint: the MTProto session is
   sealed with AES-256-GCM under `SESSION_ENCRYPTION_KEY` before it is stored, and pending
   logins live in memory only.
+- **Deployment integration secrets are owner-only and write-only from the UI.** The first
+  account bootstraps a single `profiles.is_admin` owner; every admin request re-checks that
+  flag in the database. Supabase verification material and the Telegram API hash are sealed
+  with `SETTINGS_ENCRYPTION_KEY` before storage, never returned by an API, and `DATABASE_URL`
+  plus a Supabase `service_role` key are deliberately rejected by the form.
 
 ## Mobile
 
@@ -153,6 +163,7 @@ them. See the [mobile README](apps/mobile/README.md) for build commands and the
 - [Local development and Supabase deployment](docs/setup/local-development.md)
 - [Encryption format `stackbase/1`](docs/architecture/encryption-format.md)
 - [Architecture decisions and documented deviations](docs/architecture/decisions.md)
+- [Deployment settings report](docs/reports/deployment-settings.md)
 - [Milestone 6 report](docs/reports/milestone-6.md)
 - [Milestone 5 report](docs/reports/milestone-5.md)
 - [Milestone 4 report](docs/reports/milestone-4.md)

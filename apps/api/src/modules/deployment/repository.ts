@@ -183,7 +183,14 @@ export function applyDeploymentRow(config: Config, row: DeploymentRow | null): s
       (row.supabaseUrl
         ? `${baseUrl.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`
         : envAuth.jwksUrl),
-    jwtSecret: savedJwtApplied ? jwtSecret : envAuth.jwtSecret,
+    // An explicitly saved JWKS URL is a verification choice: do not let a
+    // legacy environment JWT secret take precedence over it.
+    jwtSecret:
+      row.supabaseJwksUrl && !sealedJwt
+        ? null
+        : savedJwtApplied
+          ? jwtSecret
+          : envAuth.jwtSecret,
     audience: 'authenticated',
   };
 
@@ -321,12 +328,21 @@ export async function updateDeploymentSettings(
           })
       : (row?.supabaseJwksUrl ?? null);
 
-  const newJwt =
+  const rawNewJwt =
     input.supabase && hasOwn(input.supabase, 'jwtSecret') ? input.supabase.jwtSecret : undefined;
-  const newPublishable =
+  const rawNewPublishable =
     input.supabase && hasOwn(input.supabase, 'publishableKey')
       ? input.supabase.publishableKey
       : undefined;
+  const newJwt = typeof rawNewJwt === 'string' ? rawNewJwt.trim() : rawNewJwt;
+  const newPublishable =
+    typeof rawNewPublishable === 'string' ? rawNewPublishable.trim() : rawNewPublishable;
+  if (newJwt === '') {
+    throw new ApiError('VALIDATION_ERROR', 400, 'The Supabase JWT secret cannot be blank.');
+  }
+  if (newPublishable === '') {
+    throw new ApiError('VALIDATION_ERROR', 400, 'The Supabase publishable key cannot be blank.');
+  }
   if ((newJwt || newPublishable) && !key) {
     requireKey(config);
   }
@@ -367,19 +383,36 @@ export async function updateDeploymentSettings(
       'A Supabase project URL is required while AUTH_MODE=supabase.',
     );
   }
-  if (
-    config.authEnv.mode === 'supabase' &&
-    nextUrl !== null &&
-    nextUrl !== currentBase &&
-    newJwt === undefined &&
-    !nextJwks &&
-    !row?.supabaseJwtSecretSealed
-  ) {
-    throw new ApiError(
-      'VALIDATION_ERROR',
-      400,
-      'Changing the Supabase project URL also requires that project’s JWT secret or JWKS URL.',
-    );
+  const changedBase = effectiveBase !== currentBase;
+  if (config.authEnv.mode === 'supabase' && changedBase) {
+    const suppliedJwt = newJwt !== undefined && newJwt !== null;
+    const suppliedJwks =
+      input.supabase !== undefined &&
+      hasOwn(input.supabase, 'jwksUrl') &&
+      input.supabase.jwksUrl !== null;
+    const savedJwt = row?.supabaseJwtSecretSealed ?? null;
+
+    if (!suppliedJwt && !suppliedJwks) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        400,
+        'Changing the Supabase project URL also requires that project’s JWT secret or JWKS URL.',
+      );
+    }
+    if (!suppliedJwt && savedJwt && newJwt !== null) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        400,
+        'Changing the Supabase project URL requires replacing or explicitly removing the saved legacy JWT secret.',
+      );
+    }
+    if (nextJwks && !suppliedJwks && suppliedJwt) {
+      throw new ApiError(
+        'VALIDATION_ERROR',
+        400,
+        'Changing the Supabase project URL requires replacing or explicitly removing the saved JWKS URL too.',
+      );
+    }
   }
 
   const nextProvider =
@@ -400,8 +433,12 @@ export async function updateDeploymentSettings(
       ? input.telegram.apiId
       : (row?.telegramApiId ?? config.storage.environmentTelegram?.apiId ?? null);
 
-  const newApiHash =
+  const rawNewApiHash =
     input.telegram && hasOwn(input.telegram, 'apiHash') ? input.telegram.apiHash : undefined;
+  const newApiHash = typeof rawNewApiHash === 'string' ? rawNewApiHash.trim() : rawNewApiHash;
+  if (newApiHash === '') {
+    throw new ApiError('VALIDATION_ERROR', 400, 'The Telegram API hash cannot be blank.');
+  }
   if (newApiHash && !key) requireKey(config);
   const nextApiHashSealed =
     newApiHash === undefined

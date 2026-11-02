@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SignJWT } from 'jose';
 import type { DeploymentSettingsResponse, MeResponse } from '@stackbase/contracts';
 import {
   authHeader,
@@ -207,6 +208,158 @@ describe('secret storage key', () => {
       expect(response.json()).toMatchObject({ error: { code: 'SETTINGS_KEY_MISSING' } });
     } finally {
       await noKey.close();
+    }
+  });
+});
+
+describe('Supabase project rotation guard', () => {
+  let supabaseCtx: TestContext;
+  let ownerToken: string;
+
+  const put = (payload: Record<string, unknown>) =>
+    supabaseCtx.app.inject({
+      method: 'PUT',
+      url: '/api/v1/admin/deployment',
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload,
+    });
+
+  beforeAll(async () => {
+    supabaseCtx = await createTestContext(
+      testConfig({
+        AUTH_MODE: 'supabase',
+        SUPABASE_URL: 'https://old-project.supabase.co',
+        SUPABASE_JWT_SECRET: 'old-project-jwt-secret',
+        SETTINGS_ENCRYPTION_KEY: SETTINGS_KEY,
+      }),
+    );
+
+    const owner = await supabaseCtx.db.query<{ id: string }>(
+      `insert into auth.users (email) values ('supabase-owner@example.com') returning id`,
+    );
+    const ownerId = owner.rows[0]?.id;
+    if (!ownerId) throw new Error('Supabase test owner was not created');
+
+    ownerToken = await new SignJWT({
+      email: 'supabase-owner@example.com',
+      role: 'authenticated',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setSubject(ownerId)
+      .setIssuer('https://old-project.supabase.co/auth/v1')
+      .setAudience('authenticated')
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(new TextEncoder().encode('old-project-jwt-secret'));
+  });
+
+  afterAll(async () => {
+    await supabaseCtx.close();
+  });
+
+  it('refuses a project URL change without new verification material', async () => {
+    const response = await put({
+      supabase: { url: 'https://new-project.supabase.co' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    expect(supabaseCtx.config.auth.mode).toBe('supabase');
+    if (supabaseCtx.config.auth.mode === 'supabase') {
+      expect(supabaseCtx.config.auth.issuer).toBe(
+        'https://old-project.supabase.co/auth/v1',
+      );
+    }
+  });
+
+  it('applies a new URL with an explicitly saved JWKS and drops the env JWT secret', async () => {
+    const response = await put({
+      supabase: {
+        url: 'https://new-project.supabase.co',
+        jwksUrl: 'https://new-project.supabase.co/auth/v1/.well-known/jwks.json',
+        jwtSecret: null,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const view = response.json() as DeploymentSettingsResponse;
+    expect(view.auth).toMatchObject({
+      supabaseUrl: 'https://new-project.supabase.co',
+      jwksUrl: 'https://new-project.supabase.co/auth/v1/.well-known/jwks.json',
+      jwtSecretConfigured: false,
+      source: 'saved',
+    });
+    expect(supabaseCtx.config.auth.mode).toBe('supabase');
+    if (supabaseCtx.config.auth.mode === 'supabase') {
+      expect(supabaseCtx.config.auth.issuer).toBe(
+        'https://new-project.supabase.co/auth/v1',
+      );
+      expect(supabaseCtx.config.auth.jwtSecret).toBeNull();
+      expect(supabaseCtx.config.auth.jwksUrl).toBe(
+        'https://new-project.supabase.co/auth/v1/.well-known/jwks.json',
+      );
+    }
+  });
+
+  it('refuses to leave a saved JWT secret from the old project behind', async () => {
+    // The rotating token is invalid after the project changes, so this scenario
+    // needs its own context: seed the old JWT while the old project is active.
+    const staleCtx = await createTestContext(
+      testConfig({
+        AUTH_MODE: 'supabase',
+        SUPABASE_URL: 'https://old-project.supabase.co',
+        SUPABASE_JWT_SECRET: 'old-project-jwt-secret',
+        SETTINGS_ENCRYPTION_KEY: SETTINGS_KEY,
+      }),
+    );
+    try {
+      const owner = await staleCtx.db.query<{ id: string }>(
+        `insert into auth.users (email) values ('stale-owner@example.com') returning id`,
+      );
+      const ownerId = owner.rows[0]?.id;
+      if (!ownerId) throw new Error('Stale-project test owner was not created');
+
+      const token = await new SignJWT({
+        email: 'stale-owner@example.com',
+        role: 'authenticated',
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setSubject(ownerId)
+        .setIssuer('https://old-project.supabase.co/auth/v1')
+        .setAudience('authenticated')
+        .setIssuedAt()
+        .setExpirationTime('1h')
+        .sign(new TextEncoder().encode('old-project-jwt-secret'));
+      const headers = { authorization: `Bearer ${token}` };
+
+      const seeded = await staleCtx.app.inject({
+        method: 'PUT',
+        url: '/api/v1/admin/deployment',
+        headers,
+        payload: {
+          supabase: {
+            url: 'https://old-project.supabase.co',
+            jwtSecret: 'old-project-jwt-secret',
+          },
+        },
+      });
+      expect(seeded.statusCode).toBe(200);
+
+      const response = await staleCtx.app.inject({
+        method: 'PUT',
+        url: '/api/v1/admin/deployment',
+        headers,
+        payload: {
+          supabase: {
+            url: 'https://another-project.supabase.co',
+            jwksUrl: 'https://another-project.supabase.co/auth/v1/.well-known/jwks.json',
+          },
+        },
+      });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ error: { code: 'VALIDATION_ERROR' } });
+    } finally {
+      await staleCtx.close();
     }
   });
 });

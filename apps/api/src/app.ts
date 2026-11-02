@@ -116,7 +116,7 @@ export async function buildApp({
 
   await app.register(cors, {
     origin: config.webOrigin,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['authorization', 'content-type'],
     maxAge: 600,
   });

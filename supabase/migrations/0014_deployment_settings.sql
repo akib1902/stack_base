@@ -101,3 +101,12 @@ comment on column public.deployment_settings.telegram_api_hash_sealed is
 
 alter table public.deployment_settings enable row level security;
 revoke all on public.deployment_settings from anon, authenticated;
+
+do $$
+begin
+  if has_table_privilege('anon', 'public.deployment_settings', 'SELECT')
+     or has_table_privilege('authenticated', 'public.deployment_settings', 'SELECT') then
+    raise exception 'deployment_settings must have no client grants';
+  end if;
+end;
+$$;

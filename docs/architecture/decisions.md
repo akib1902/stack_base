@@ -385,3 +385,41 @@ full-stream hash mismatch and provider size mismatch return `UPLOAD_INTEGRITY_FA
 
 **Consequences.** Clients branch on stable codes; the milestone report lists which codes
 appear on which endpoint.
+
+---
+
+## ADR-019 — Owner-managed deployment credentials sealed with a server key
+
+**Context.** Operators need to change the Supabase Auth verification material and the
+Telegram MTProto application credentials without editing files or exposing secrets in the
+browser. The existing configuration is environment-only and is read before the API can
+reach its database, which makes a general-purpose database config form unsafe. A normal
+user must not be able to read or change deployment credentials simply because they can
+sign in.
+
+**Decision.** Add one server-only `deployment_settings` row and one owner flag
+(`profiles.is_admin`). The first profile in a database bootstraps the owner; a unique
+partial index permits exactly one. `requireAdmin` reads that flag from the database on
+every request; no client claim or email is trusted. Client roles receive no grants on
+`deployment_settings`, and `profiles` insert/update grants are removed so a user cannot
+promote themselves or write their own profile directly.
+
+The owner page at `/settings/deployment` talks to the authenticated Next proxy; the PUT
+proxy additionally requires a same-origin `Origin` header. Secrets are encrypted with
+AES-256-GCM under `SETTINGS_ENCRYPTION_KEY` before storage. GET responses expose only
+presence flags and public identifiers. PUT audit records contain field names, never
+values. Supabase URL/JWKS/JWT changes apply to the live auth verifier when
+`AUTH_MODE=supabase`; Telegram API ID/hash and provider changes apply to the live storage
+resolver immediately. Environment values remain the baseline and fallback.
+
+The form deliberately does not accept `DATABASE_URL`, `AUTH_MODE`, `SESSION_ENCRYPTION_KEY`
+or a Supabase `service_role` key. The first cannot be bootstrapped from a database row it
+is needed to open; the second and third are process-level recovery/lockout controls; the
+last is unused by this API and would add a bypass for row-level security.
+
+**Consequences.** The owner can rotate integration credentials without a redeploy, while a
+stolen web session for an ordinary account has no path to the secrets. Losing
+`SETTINGS_ENCRYPTION_KEY` makes saved overrides unreadable, so the API falls back to the
+environment and the form reports that secret storage is unavailable. A multi-process
+deployment must restart other API instances to pick up changes because the current
+implementation applies them to the running process's in-memory config.
