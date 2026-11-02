@@ -51,3 +51,32 @@ export const DevSessionResponseSchema = Type.Object({
   user: Type.Object({ id: Type.String(), email: Type.String() }),
 });
 export type DevSessionResponse = Static<typeof DevSessionResponseSchema>;
+
+export const AuthModeSchema = Type.Union([Type.Literal('dev'), Type.Literal('supabase')]);
+export type AuthMode = Static<typeof AuthModeSchema>;
+
+/** Public web sign-in discovery. No Supabase URL or key is exposed here. */
+export const AuthConfigResponseSchema = Type.Object({
+  mode: AuthModeSchema,
+  supabaseReady: Type.Boolean(),
+});
+export type AuthConfigResponse = Static<typeof AuthConfigResponseSchema>;
+
+/** Server-to-server Supabase password sign-in; never sent to the browser. */
+export const SupabaseSignInRequestSchema = Type.Object({
+  email: Type.String({ format: 'email', minLength: 3, maxLength: 320 }),
+  password: Type.String({ minLength: 1, maxLength: 1024 }),
+});
+export type SupabaseSignInRequest = Static<typeof SupabaseSignInRequestSchema>;
+
+export const SupabaseRefreshRequestSchema = Type.Object({
+  refreshToken: Type.String({ minLength: 1, maxLength: 4096 }),
+});
+export type SupabaseRefreshRequest = Static<typeof SupabaseRefreshRequestSchema>;
+
+export const SupabaseSessionResponseSchema = Type.Object({
+  accessToken: Type.String(),
+  refreshToken: Type.String(),
+  expiresAt: Type.String(),
+});
+export type SupabaseSessionResponse = Static<typeof SupabaseSessionResponseSchema>;

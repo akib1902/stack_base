@@ -40,8 +40,8 @@ These values were read from the repository and from the vendors' release metadat
 | Android support | API **24–37** supported; CI-tested 24–36 | [Flutter supported platforms](https://docs.flutter.dev/reference/supported-platforms) |
 | Android target | `compileSdk = 36`, `targetSdk = 36`, `minSdk = 24` | Google Play requires API 36 for new apps/updates since 31 Aug 2026 |
 | iOS support | iOS **15–27**; Xcode 27 builds | Flutter 3.47 supported-platforms page and release notes |
-| API surface | **51 routes**: 47 authenticated, 2 public share routes, `/health`, dev session | `apps/api/src/**` route table; security sweep |
-| Database | 13 migrations; no mobile-only table is required for M1–M6 | `supabase/migrations/` |
+| API surface | **55 routes**: 48 authenticated, 2 public share routes, 4 public auth routes, `/health` | `apps/api/src/**` route table; security sweep |
+| Database | 14 migrations; no mobile-only table is required for M1–M6 | `supabase/migrations/` |
 | Encryption | `stackbase/1`, libsodium secretstream + Argon2id | [encryption-format.md](../architecture/encryption-format.md) |
 | Build host | Windows; Android SDK 36 present; Flutter/Dart, NDK, CMake, make and the iOS toolchain are **absent** | `flutter --version`, `java -version`, `C:/Android` |
 
@@ -127,9 +127,9 @@ can override the API, clock, file system and database without a global singleton
 
 ### MADR-004 — Supabase Auth with secure, per-device session storage
 
-**Context.** The web app keeps its token in an httpOnly cookie and reaches the API through
-Next route handlers. A native app has neither mechanism, and the web Supabase sign-in
-screen is still absent (Milestone 6 blocker).
+**Context.** The web app keeps its tokens in httpOnly cookies and reaches the API through
+Next route handlers. A native app has neither mechanism; it talks to Supabase GoTrue
+directly and must protect its own session storage.
 
 **Decision.** Use `supabase_flutter 2.18.3` for GoTrue only (password sign-in, refresh,
 sign-out), not for database access. Pass a custom `LocalStorage` backed by
@@ -524,7 +524,8 @@ host. That is stated as a limitation, not as a pass.
 - The local file manager is not a full-device file browser; see the capability matrix.
 - Sharing is managed (create/list/revoke); consuming a public share link in-app is not
   required for the first release because the link opens the existing web viewer.
-- The web Supabase sign-in screen remains a product-level blocker independent of mobile.
+- The web Supabase sign-in flow is email/password only; magic links, OAuth and MFA remain
+  independent product work.
 
 ## 11. References
 

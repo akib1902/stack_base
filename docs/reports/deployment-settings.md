@@ -97,12 +97,14 @@ change.
 | Check | Result |
 |---|---|
 | `pnpm -r typecheck` | pass — contracts, API, web |
-| `pnpm --filter @stackbase/api test` | pass — **19 files / 180 tests** |
+| `pnpm --filter @stackbase/api test` | pass — **20 files / 187 tests** |
 | `apps/api/test/deployment-settings.test.ts` | **11/11** — owner bootstrap, non-owner 401/403, sanitized GET, sealed DB values, apply-to-config, clear, bad hash, missing settings key, and Supabase project-rotation guards |
+| `apps/api/test/auth-supabase.test.ts` | **7/7** — mode discovery, password exchange, sanitized provider errors, refresh, missing key, sign-out revocation, saved-key application |
 | `apps/api/test/rls.test.ts` | **16/16** — includes a direct attempt by an authenticated account to promote itself (permission denied) |
 | `apps/api/test/security-sweep.test.ts` | **16/16** — the new admin routes are in the anonymous-401 sweep |
-| `pnpm --filter @stackbase/web test` | pass — 13 files / 100 tests |
-| `pnpm --filter @stackbase/web build` | pass — `/settings/deployment` and `/api/deployment` built |
+| `pnpm --filter @stackbase/web test` | pass — 14 files / 103 tests |
+| `apps/web/test/auth-token.test.ts` | **3/3** — access-token expiry/refresh leeway |
+| `pnpm --filter @stackbase/web build` | pass — `/settings/deployment`, `/api/deployment` and the auth Proxy built |
 | `git diff --check` | pass |
 
 No real Supabase project or Telegram account was used. The persistence, access-control,
@@ -128,9 +130,10 @@ provider boundaries; external network verification remains an operator step.
 
 ## Remaining limitations
 
-1. **Supabase web sign-in is still not implemented.** `AUTH_MODE` remains environment-only,
-   and the web sign-in form still uses dev sessions. The new page can rotate the API's
-   verification material; it does not make a Supabase-backed deployment sign users in.
+1. **Supabase web sign-in is email/password only and has not been live-tested.**
+   `AUTH_MODE` remains environment-only. The web server exchanges credentials with
+   Supabase and keeps access/refresh tokens in httpOnly cookies; magic-link, OAuth and MFA
+   UI are not implemented, and no real Supabase project was available here.
 2. **Database URL and service_role are not UI-managed.** This is intentional and documented
    on the page; adding them would require a separate bootstrap secret store and a much
    broader threat model.

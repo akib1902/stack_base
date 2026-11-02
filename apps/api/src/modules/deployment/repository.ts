@@ -142,7 +142,12 @@ export function applyDeploymentRow(config: Config, row: DeploymentRow | null): s
     return warnings;
   }
 
-  if (!row.supabaseUrl && !row.supabaseJwtSecretSealed && !row.supabaseJwksUrl) {
+  if (
+    !row.supabaseUrl &&
+    !row.supabasePublishableKeySealed &&
+    !row.supabaseJwtSecretSealed &&
+    !row.supabaseJwksUrl
+  ) {
     config.auth = envAuth;
     return warnings;
   }
@@ -175,6 +180,18 @@ export function applyDeploymentRow(config: Config, row: DeploymentRow | null): s
     return warnings;
   }
 
+  let publishableKey = envAuth.publishableKey;
+  if (row.supabasePublishableKeySealed) {
+    try {
+      if (!key) throw new Error('missing key');
+      publishableKey = openSecret(row.supabasePublishableKeySealed, key);
+    } catch {
+      warnings.push(
+        'Saved Supabase publishable key could not be opened; the environment value is in use.',
+      );
+    }
+  }
+
   config.auth = {
     mode: 'supabase',
     issuer: `${baseUrl.replace(/\/$/, '')}/auth/v1`,
@@ -191,6 +208,7 @@ export function applyDeploymentRow(config: Config, row: DeploymentRow | null): s
         : savedJwtApplied
           ? jwtSecret
           : envAuth.jwtSecret,
+    publishableKey,
     audience: 'authenticated',
   };
 
@@ -246,7 +264,9 @@ export async function getDeploymentSettings(
       mode: config.auth.mode,
       active: config.auth.mode === 'supabase',
       supabaseUrl: row?.supabaseUrl ?? authBase,
-      publishableKeyConfigured: Boolean(row?.supabasePublishableKeySealed),
+      publishableKeyConfigured:
+        Boolean(row?.supabasePublishableKeySealed) ||
+        (config.auth.mode === 'supabase' && Boolean(config.auth.publishableKey)),
       jwtSecretConfigured:
         config.auth.mode === 'supabase'
           ? Boolean(config.auth.jwtSecret)

@@ -33,6 +33,10 @@ validated at startup; the process refuses to boot with a clear list of problems.
 | `AUTH_MODE` | `dev` | `dev` or `supabase` |
 | `DEV_AUTH_SECRET` | — | Required for `AUTH_MODE=dev`, min 32 chars |
 | `DEV_SESSION_TTL_SECONDS` | `86400` | 300–2592000 |
+| `SUPABASE_URL` | — | Required for `AUTH_MODE=supabase`; project base URL |
+| `SUPABASE_PUBLISHABLE_KEY` | — | Required for web sign-in; also stored by Deployment settings |
+| `SUPABASE_JWKS_URL` | derived | Optional asymmetric-key JWKS override |
+| `SUPABASE_JWT_SECRET` | — | Legacy HS256 verification material; prefer JWKS |
 | `DATABASE_URL` | empty | Empty ⇒ local PGlite; set ⇒ PostgreSQL/Supabase |
 | `STACKBASE_LOCAL_AUTH_STUB` | `0` | Only for a bare PostgreSQL without Supabase's auth schema |
 | `STORAGE_PROVIDER` | `local` | `local` (filesystem, development only) or `telegram` |
@@ -199,6 +203,7 @@ upload pipeline).
    ```env
    AUTH_MODE=supabase
    SUPABASE_URL=https://<ref>.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
    SUPABASE_JWKS_URL= # optional; defaults to <SUPABASE_URL>/auth/v1/.well-known/jwks.json
    SUPABASE_JWT_SECRET= # only for legacy HS256 signing keys
    DATABASE_URL=postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres
@@ -208,8 +213,12 @@ upload pipeline).
    `authenticated`) against the project's JWKS, or against the legacy JWT secret when one
    is configured. `POST /api/v1/dev/session` is not registered in this mode.
 
-4. The web app needs a Supabase sign-in screen before it can be deployed. Until that
-   ships (a later milestone), `AUTH_MODE=dev` is the supported local and self-hosted path.
+4. Restart the API and web app, open `/sign-in` and use the email/password of a user from
+   that Supabase project. The web server exchanges the password with Supabase through
+   `/api/v1/auth/supabase/sign-in`; access and refresh tokens are kept in httpOnly cookies.
+   A `proxy.ts` refresh hook rotates the access cookie before it expires. The owner can
+   also set the project URL and publishable key in **Deployment settings**; `AUTH_MODE`
+   itself remains environment-only. Magic-link, OAuth and MFA UI are not included.
 
 ## Production checklist
 
@@ -232,10 +241,12 @@ clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
    `NODE_ENV=production` refuses to boot. With `STORAGE_PROVIDER=telegram` and no linked
    account yet, uploads return `409 STORAGE_DISCONNECTED` and setup status reports
    `not_configured`, which is what the Settings screen displays.
-4. **The web app cannot sign in yet under Supabase Auth.** This is the one open blocker
-   for a production deployment: the sign-in screen only implements local development
-   identities. Set `AUTH_MODE=dev` for any web deployment for now; do not expose a
-   production deployment with the dev sign-in reachable.
+4. **Supabase email/password web sign-in is implemented, but not live-tested here.** The
+   browser never receives the Supabase URL/key or a token through JavaScript: the web
+   server calls the API's `/api/v1/auth/supabase/sign-in` and `/refresh` endpoints, and
+   stores the result in httpOnly cookies. The owner must set `SUPABASE_PUBLISHABLE_KEY`
+   (or save it in Deployment settings) and valid JWT/JWKS material. Magic links, OAuth and
+   MFA UI are out of scope; verify the flow against a real Supabase project before release.
 5. **The database.** `DATABASE_URL` empty selects the embedded PGlite database, and that
    is still accepted in production. It is a single-process database kept in
    `apps/api/.data/pglite` — fine for a self-hosted single-instance deployment, not for
@@ -262,13 +273,13 @@ clean-deployment section of the [Milestone 6 report](../reports/milestone-6.md).
 | Page renders but buttons and inputs do nothing, console shows blocked `/_next/hmr` or font requests | Opened as `127.0.0.1`: Next 16 blocks its development client assets from other origins, so React never hydrates. Use <http://localhost:3000> |
 | API exits with `RuntimeError: Aborted()` from PGlite | The local WASM database was left unrecoverable by an abrupt process kill. Stop the API, move `apps/api/.data/pglite` aside, and restart — a fresh database is created and migrated. Prefix with `STACKBASE_LOCAL_DATA_DIR` to verify against a separate directory without touching it |
 | `Migration failed: schema "auth" does not exist` | You pointed `DATABASE_URL` at a bare PostgreSQL. Use Supabase, or set `STACKBASE_LOCAL_AUTH_STUB=1` knowingly |
-| Sign-in returns 404 | The API runs with `AUTH_MODE=supabase` or `NODE_ENV=production`; dev sessions are disabled by design |
+| Sign-in returns 404 | `/api/v1/dev/session` is absent in production/Supabase mode by design. If `/api/v1/auth/config` is 404, the API and web builds are mismatched |
 | Upload fails with `TELEGRAM_NOT_CONFIGURED` (503) | `STORAGE_PROVIDER=telegram` without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH`/`SESSION_ENCRYPTION_KEY` |
 | Upload fails with `STORAGE_DISCONNECTED` (409) | Link the Telegram account from Settings, or switch back to `STORAGE_PROVIDER=local` |
 | Settings shows *Development storage* | That is the local filesystem provider working as intended outside production |
 | Download fails with a decryption error | The stored ciphertext does not match its manifest; run `pnpm storage:verify` and re-upload |
 | `db:reset` refuses to run | `DATABASE_URL` is set; drop and recreate that database deliberately instead |
 | Every request returns 401 “This session no longer matches an account in this deployment” | The token is signed correctly but its user is gone from `auth.users`; sign in again. Tokens are not revoked by Supabase when a user is deleted, so this check is what closes that window |
-| The web app has no way to sign in against Supabase | Not implemented yet: the sign-in screen only issues local development sessions. Use `AUTH_MODE=dev` |
+| Supabase sign-in says it is not configured | Set `SUPABASE_PUBLISHABLE_KEY` (or save the publishable key in Deployment settings), then restart/refresh |
 | Deployment settings return `SETTINGS_KEY_MISSING` | Add `SETTINGS_ENCRYPTION_KEY` (32 bytes base64) to `apps/api/.env` and restart. Public values can still be read without it |
 | Owner cannot see the Deployment page | Only the first account in the database is `profiles.is_admin`; check `select id, is_admin from public.profiles order by created_at` |

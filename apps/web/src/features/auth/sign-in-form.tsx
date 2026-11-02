@@ -1,13 +1,15 @@
 'use client';
 
 import { useActionState } from 'react';
+import type { AuthMode } from '@stackbase/contracts';
 import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { signInAction } from './actions';
 import { initialSignInState } from './sign-in-state';
 
-export function SignInForm() {
+export function SignInForm({ mode }: { mode: AuthMode }) {
   const [state, formAction, pending] = useActionState(signInAction, initialSignInState);
+  const isSupabase = mode === 'supabase';
 
   return (
     <form action={formAction} className="space-y-4">
@@ -27,10 +29,31 @@ export function SignInForm() {
           className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted/70 focus-visible:border-primary"
         />
         <p id="signin-hint" className="mt-1.5 text-xs leading-relaxed text-muted">
-          Local development identity. Any address creates or resumes an account on
-          this machine&apos;s database.
+          {isSupabase
+            ? 'Use the email address for your account on this instance.'
+            : 'Local development identity. Any address creates or resumes an account on this machine’s database.'}
         </p>
       </div>
+
+      {isSupabase ? (
+        <div>
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
+            Password
+          </label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            aria-describedby="password-hint"
+            className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus-visible:border-primary"
+          />
+          <p id="password-hint" className="mt-1.5 text-xs leading-relaxed text-muted">
+            Your password goes to this server, which exchanges it with Supabase. It is not stored.
+          </p>
+        </div>
+      ) : null}
 
       <div aria-live="polite">
         {state.error ? (
@@ -52,7 +75,7 @@ export function SignInForm() {
           </>
         ) : (
           <>
-            Continue
+            {isSupabase ? 'Sign in' : 'Continue'}
             <ArrowRight className="size-4" aria-hidden="true" />
           </>
         )}

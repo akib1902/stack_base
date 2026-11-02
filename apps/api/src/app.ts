@@ -8,6 +8,7 @@ import { ApiError, authRequired, forbidden } from './errors';
 import { isDatabaseUnavailable, type Db } from './database/db';
 import { createDynamicTokenVerifier, readBearerToken } from './security/token';
 import { registerDeploymentRoutes } from './modules/deployment/routes';
+import { registerAuthRoutes } from './modules/auth/routes';
 import { loadDeploymentSettings } from './modules/deployment/repository';
 import { registerHealthRoutes } from './modules/health/routes';
 import { registerMeRoutes } from './modules/me/routes';
@@ -221,6 +222,7 @@ export async function buildApp({
   registerMeRoutes(app, { db });
   registerSetupRoutes(app, { db, getProvider: () => config.storage.provider });
   registerDeploymentRoutes(app, { db, config });
+  registerAuthRoutes(app, { config });
   registerLibraryRoutes(app, { db, config });
   registerEncryptionRoutes(app, { db });
   registerUploadRoutes(app, { db, config });

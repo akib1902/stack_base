@@ -141,6 +141,9 @@ function routeTable(): RouteEntry[] {
  */
 const PUBLIC_ROUTES = new Set([
   'POST /api/v1/dev/session', // local development sign-in; never registered in production
+  'GET /api/v1/auth/config', // public mode discovery; returns no credentials
+  'POST /api/v1/auth/supabase/sign-in', // password exchange, rate-limited
+  'POST /api/v1/auth/supabase/refresh', // refresh-token exchange, rate-limited
   'GET /api/v1/public/shares/:token', // the 43-character token is the capability
   'GET /api/v1/public/shares/:token/download',
 ]);
@@ -233,6 +236,7 @@ function validRequest(
     'POST /api/v1/uploads/:uploadId/resume',
     'POST /api/v1/uploads/:uploadId/retry',
     'POST /api/v1/storage/telegram/disconnect',
+    'POST /api/v1/auth/supabase/sign-out',
     'POST /api/v1/files/:fileId/versions/:versionId/restore',
   ]);
   if (bodyless.has(key) || method === 'GET' || method === 'DELETE') return { url };
@@ -272,7 +276,7 @@ describe('authentication boundary', () => {
     expect(anonymousFailures).toEqual([]);
   });
 
-  it('serves only the three public routes without a session', async () => {
+  it('serves only the public routes without a session', async () => {
     const publicPaths = new Set([...PUBLIC_ROUTES].map((route) => route.split(' ')[1]));
     for (const route of routeTable()) {
       if (PUBLIC_ROUTES.has(`${route.method} ${route.path}`)) continue;

@@ -26,7 +26,7 @@ do not survive verification.
 | Response encoding | JSON except chunk upload, ciphertext download and `application/octet-stream` bodies. |
 | Caching | The API sets `cache-control: no-store` unless a route overrides it. Mobile must not cache private responses in an HTTP cache. |
 | Error envelope | `{ "error": { "code": string, "message": string, "details"?: object } }`. Branch on `code`, never on message text. |
-| Rate limits | Global 240 requests/minute per client key; chunk upload 1,200/minute; dev session 20/minute; public share view 60/minute; public share download 30/minute. `429` is `RATE_LIMITED` (Telegram-specific waits use `TELEGRAM_RATE_LIMIT`). |
+| Rate limits | Global 240 requests/minute per client key; chunk upload 1,200/minute; dev session 20/minute; Supabase sign-in 10/minute; Supabase refresh 30/minute; public share view 60/minute; public share download 30/minute. `429` is `RATE_LIMITED` (Telegram-specific waits use `TELEGRAM_RATE_LIMIT`). |
 | Request limits | JSON body limits apply; chunk bodies are capped at `MAX_PLAINTEXT_CHUNK_SIZE + 17 + 1024` bytes. |
 | Date format | ISO-8601 strings with `Z` offsets as produced by `toIsoString`. |
 | IDs | UUIDs for files/folders/versions/uploads/shares/tags; share tokens are 43-character base64url strings. |
@@ -43,6 +43,7 @@ SHARE_EXPIRED, SHARE_REVOKED, DATABASE_UNAVAILABLE,
 STORAGE_RECONCILIATION_REQUIRED, VAULT_ALREADY_EXISTS, TELEGRAM_NOT_CONFIGURED,
 UPLOAD_NOT_FOUND, SHARE_NOT_FOUND, SHARE_KEY_UNAVAILABLE, SHARE_FILE_UNAVAILABLE,
 SHARE_DOWNLOAD_LIMIT_REACHED, RATE_LIMITED, ROUTE_NOT_FOUND, INTERNAL_ERROR
+SUPABASE_NOT_CONFIGURED, SUPABASE_UNAVAILABLE
 ```
 
 Mobile must map at least:
@@ -64,15 +65,19 @@ The API never returns stack traces, provider credentials or key material.
 
 ## 2. Endpoint inventory
 
-**51 routes** exist in the audited build. All except `/health`, the dev-session route and
-the two public share routes require a bearer token. "Auth" below means bearer unless
-stated otherwise.
+**55 routes** exist in the audited build. All except `/health`, the four public auth routes
+(`dev/session`, auth config, Supabase sign-in and refresh) and the two public share routes
+require a bearer token. "Auth" below means bearer unless stated otherwise.
 
 ### 2.1 Identity, setup and encryption
 
 | Method | Path | Auth | Request | Response | Mobile use |
 |---|---|---|---|---|---|
 | POST | `/api/v1/dev/session` | none, dev only | `{ email }` | `DevSessionResponse` | Debug builds only; absent in production/Supabase mode. |
+| GET | `/api/v1/auth/config` | none | — | `{ mode, supabaseReady }` | Web discovery; mobile uses its build-time Supabase config. |
+| POST | `/api/v1/auth/supabase/sign-in` | none | `{ email, password }` | `{ accessToken, refreshToken, expiresAt }` | Web-only server-side password exchange; rate-limited. |
+| POST | `/api/v1/auth/supabase/refresh` | none | `{ refreshToken }` | Same session shape | Web-only refresh; native refreshes directly with GoTrue. |
+| POST | `/api/v1/auth/supabase/sign-out` | yes | — | 204 | Web-only upstream revocation; local cookie clearing is still required. |
 | GET | `/api/v1/me` | yes | — | `MeResponse` (`user`, `settings`) | Account header, settings defaults. |
 | PATCH | `/api/v1/me/settings` | yes | `UserSettingsUpdate` | `UserSettings` | Theme/view/sort/retention/offline preference. |
 | GET | `/api/v1/setup/status` | yes | — | `SetupStatusResponse` | Storage/vault readiness; drives upload gating. |
@@ -457,13 +462,13 @@ is not safe to implement the stale list.
 16 GiB maximum. The app must not assume 16 GiB. This audit corrects the setup table and
 notes the discrepancy; the code is authoritative.
 
-### I4 — Production web sign-in is still missing
+### I4 — Production web sign-in is resolved for email/password
 
-`POST /api/v1/dev/session` is not registered when `AUTH_MODE=supabase` or in production
-(`apps/api/src/app.ts:219-221`). The web sign-in screen still posts only to that route.
-Mobile does not inherit the cookie problem because it talks to Supabase Auth directly, but
-the product still needs a Supabase project and a working sign-in path for the web. This is
-an external release blocker, not a mobile API incompatibility.
+The web now uses `POST /api/v1/auth/supabase/sign-in` and `/refresh`; tokens stay in
+httpOnly cookies and a Next.js proxy refreshes them. `POST /api/v1/dev/session` remains
+absent in Supabase/production mode by design. Native still uses GoTrue directly. Magic
+links, OAuth, MFA UI and a live Supabase project check remain external work, not a mobile
+API incompatibility.
 
 ### I5 — No client-config endpoint
 

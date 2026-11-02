@@ -24,6 +24,9 @@ export const ERROR_CODES = [
   // Added in Milestone 3 (ADR-018); the A11 list is explicitly non-exhaustive.
   'VAULT_ALREADY_EXISTS',
   'TELEGRAM_NOT_CONFIGURED',
+  // Supabase Auth proxy: configuration and upstream availability are distinct.
+  'SUPABASE_NOT_CONFIGURED',
+  'SUPABASE_UNAVAILABLE',
   // Owner-managed deployment settings require a server-side encryption key.
   'SETTINGS_KEY_MISSING',
   'UPLOAD_NOT_FOUND',

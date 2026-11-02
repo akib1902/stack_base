@@ -21,10 +21,11 @@ The authoritative specification is [SRS & FDD.md](SRS%20%26%20FDD.md).
 > anonymous callers and that one account cannot read or change another's data.
 > The owner-only Deployment settings screen can rotate Supabase Auth verification material and
 > Telegram MTProto application credentials; secrets are sealed at rest and never returned.
+> Supabase email/password sign-in is now server-side: the browser receives only httpOnly
+> access and refresh cookies, and a Next.js proxy refreshes them before expiry.
 > A clean-clone deployment check (install, migrate, seed, build, tests, and a
-> production-mode API verified against locally minted Supabase tokens) passes. The one
-> open blocker for release is the Supabase sign-in screen: the web app still signs in
-> with local development identities only, and the UI never pretends otherwise.
+> production-mode API verified against locally minted Supabase tokens) passes. Magic links,
+> OAuth and a live Supabase project check remain external verification/product work.
 > The Flutter client has completed **Mobile Milestone 2** (cloud browser and per-account
 > offline metadata cache). See the [Milestone 5](docs/reports/milestone-5.md),
 > [Milestone 6](docs/reports/milestone-6.md),

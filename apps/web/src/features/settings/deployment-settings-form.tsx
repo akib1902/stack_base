@@ -146,7 +146,7 @@ export function DeploymentSettingsForm({ initial }: { initial: DeploymentSetting
         <CardHeading
           icon={<ShieldCheck className="size-4" />}
           title="Supabase Auth"
-          hint="Verification material used by the API; the web sign-in screen is unchanged"
+          hint="Used by the API verifier and the server-side web sign-in proxy"
           action={
             <Badge variant={settings.auth.active ? 'success' : 'muted'}>
               {settings.auth.mode === 'supabase' ? 'AUTH_MODE=supabase' : 'AUTH_MODE=dev'}
@@ -235,8 +235,8 @@ export function DeploymentSettingsForm({ initial }: { initial: DeploymentSetting
         <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-muted">
           These values are applied only when the API runs with <code className="font-mono">AUTH_MODE=supabase</code>.
           Changing the project URL requires the matching JWT secret or JWKS URL, so saved material
-          cannot silently verify tokens from a different project. The publishable key is stored for
-          future client configuration; it is never returned by this API.
+          cannot silently verify tokens from a different project. The publishable key is used only
+          by the server-side sign-in proxy; it is never returned by this API.
         </p>
         {settings.auth.source === 'saved' ? (
           <p className="mt-2 text-[11px] leading-relaxed text-muted">

@@ -50,9 +50,11 @@ Both modes reject tokens whose `role` claim is anything but `authenticated` (so 
 Supabase `service_role` token can never act as an end user) and reject subjects that are
 not UUIDs. Identity is always the token subject.
 
-**Consequences.** Deployment requires a Supabase sign-in screen in the web app before
-`AUTH_MODE=supabase` is usable end to end; that is a later milestone. Until then the
-supported self-hosted path is the documented local mode.
+**Consequences.** The web app signs in with Supabase email/password through server-side
+API endpoints; the browser only receives httpOnly access/refresh cookies, and a Next.js
+proxy refreshes the access token. `AUTH_MODE` remains environment-only so switching modes
+cannot strand every session mid-request. Magic-link, OAuth and MFA UI are not included,
+and a live Supabase project is still required for end-to-end verification.
 
 ---
 

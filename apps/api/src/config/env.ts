@@ -16,6 +16,7 @@ const RawEnvSchema = Type.Object({
   DEV_AUTH_SECRET: Type.Optional(Type.String({ minLength: 32 })),
   DEV_SESSION_TTL_SECONDS: Type.Optional(Type.String({ pattern: '^[0-9]{1,7}$' })),
   SUPABASE_URL: Type.Optional(Type.String({ minLength: 1 })),
+  SUPABASE_PUBLISHABLE_KEY: Type.Optional(Type.String({ minLength: 1 })),
   SUPABASE_JWT_SECRET: Type.Optional(Type.String({ minLength: 1 })),
   SUPABASE_JWKS_URL: Type.Optional(Type.String({ minLength: 1 })),
   DATABASE_URL: Type.Optional(Type.String()),
@@ -48,6 +49,8 @@ type AuthConfig =
       issuer: string;
       jwksUrl: string | null;
       jwtSecret: string | null;
+      /** Public client key used by the server-side password/refresh proxy. */
+      publishableKey: string | null;
       audience: string;
     };
 
@@ -229,6 +232,7 @@ function buildAuthConfig(
       raw.SUPABASE_JWKS_URL ??
       `${raw.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/.well-known/jwks.json`,
     jwtSecret: raw.SUPABASE_JWT_SECRET ?? null,
+    publishableKey: raw.SUPABASE_PUBLISHABLE_KEY ?? null,
     audience: 'authenticated',
   };
 }
